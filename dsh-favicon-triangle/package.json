@@ -1,0 +1,23 @@
+{
+  "name": "dsh-favicon-triangle",
+  "version": "0.1.0",
+  "description": "DSH Web GUI plugin: serves a triangle as the browser tab icon",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "cordis.patch.yml"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "license": "MIT"
+}

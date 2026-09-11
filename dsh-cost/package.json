@@ -1,0 +1,28 @@
+{
+  "name": "dsh-cost",
+  "version": "0.1.0",
+  "description": "DSH Web plugin: conversation cost pill with DeepSeek balance",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
+  },
+  "files": [
+    "index.js",
+    "host",
+    "lib/client.js"
+  ],
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "license": "MIT",
+  "private": true
+}

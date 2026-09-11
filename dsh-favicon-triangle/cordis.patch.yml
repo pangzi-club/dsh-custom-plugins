@@ -1,0 +1,6 @@
+# Bundle layer for dsh-favicon-triangle: inserts the plugin row by package name.
+# Install with `dsh plugin add <path-or-tarball>`; the row then resolves through
+# Node resolution inside the profile's own node_modules.
+- insert:
+    - id: favicon-triangle
+      name: dsh-favicon-triangle
