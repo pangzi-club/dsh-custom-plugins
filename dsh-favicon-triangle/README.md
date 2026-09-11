@@ -33,7 +33,7 @@ webserver 的路由匹配顺序是：**exact 路由 → 最长 prefix → fallba
 ```yaml
 - insert:
     - id: favicon-triangle
-      name: '/Users/bohaowang/orca/projects/dsh-custom/dsh-favicon-triangle/index.js'
+      name: '/path/to/dsh-custom/dsh-favicon-triangle/index.js'
 ```
 
 `web` profile 的 `patchReload` 是 `live`，所以保存后**无需重启**即生效（页面刷新即可看到）。
@@ -42,7 +42,7 @@ webserver 的路由匹配顺序是：**exact 路由 → 最长 prefix → fallba
 也可以按包名安装为可分发插件：
 
 ```sh
-dsh plugin --profile web add /Users/bohaowang/orca/projects/dsh-custom/dsh-favicon-triangle
+dsh plugin --profile web add /path/to/dsh-custom/dsh-favicon-triangle
 ```
 
 ## 关闭

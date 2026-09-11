@@ -23,7 +23,7 @@ pill ──GET /api/dsh-cost/session?session=<id>──▶ 读日志 → 逐样�
 
 ```yaml
     - id: cost
-      name: '/Users/bohaowang/orca/projects/dsh-custom/dsh-cost/index.js'
+      name: '/path/to/dsh-custom/dsh-cost/index.js'
       config:
         timeZone: Asia/Shanghai        # 分档所用时区
         provider: deepseek             # 目前只有 deepseek 支持余额
@@ -51,7 +51,7 @@ npm test                 # node --test test/*.test.mjs（40 项）
 node build.mjs           # 用仓库的 tsc 编译 src/client/index.tsx 并包成 lib/client.js
 ```
 
-`build.mjs` 默认用 `/Users/bohaowang/Workspace/SourceCode/deepseek-harness` 里的 `tsc`，可用 `DSH_REPO=/path` 覆盖。客户端 bundle 只有 `lib/client.js` 一个资源会被 `/plugins` 服务，因此 `src/client/index.tsx` 必须保持单文件、无相对 import。
+`build.mjs` 用 DSH checkout 里的 `tsc`；checkout 路径是机器本地配置，代码里不写死。解析顺序：环境变量 `DSH_REPO` → 本目录下 git-ignored 的 `.dsh-repo` 文件（首次使用写一次：`echo /path/to/deepseek-harness > .dsh-repo`）→ 带着提示信息报错。客户端 bundle 只有 `lib/client.js` 一个资源会被 `/plugins` 服务，因此 `src/client/index.tsx` 必须保持单文件、无相对 import。
 
 ## 生效与运维
 
