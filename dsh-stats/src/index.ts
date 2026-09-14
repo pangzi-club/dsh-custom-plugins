@@ -1,5 +1,7 @@
 import { summarizeUsage, DEFAULT_TIME_ZONE } from './host/fold.js'
 import { DEFAULT_CURRENCY, normalizePricing, priceRows } from './host/pricing.js'
+import type { ModelRates, PricedRoute, UnpricedRoute } from './host/pricing.js'
+import type { DshContext, NodeIncomingMessage, NodeServerResponse } from './host/context.js'
 
 /**
  * dsh-stats - session usage statistics for the Web GUI (Host half).
@@ -13,7 +15,45 @@ import { DEFAULT_CURRENCY, normalizePricing, priceRows } from './host/pricing.js
 
 const PING_PATH = '/dsh-stats/ping'
 
-const DEFAULT_CONFIG = { label: 'dsh-stats', timestamp: true, timeZone: DEFAULT_TIME_ZONE }
+/** The plugin row's `config` mapping; values are validated at load. */
+interface PluginRowConfig {
+  label?: unknown
+  timestamp?: unknown
+  timeZone?: unknown
+  pricing?: unknown
+}
+
+/** Config after validation: defaulted and typed. */
+interface EffectiveConfig {
+  label: string
+  timestamp: boolean
+  timeZone: string
+  pricing: Map<string, ModelRates>
+}
+
+const DEFAULT_CONFIG: Pick<EffectiveConfig, 'label' | 'timestamp' | 'timeZone'> = {
+  label: 'dsh-stats',
+  timestamp: true,
+  timeZone: DEFAULT_TIME_ZONE,
+}
+
+/** The summary document served to the pill and the `session_stats` tool. */
+interface SummaryBody {
+  sessionId: string
+  label: string
+  currency: string
+  total: number
+  priced: boolean
+  routes: PricedRoute[]
+  unpriced: UnpricedRoute[]
+  samples: number
+  skipped: number
+}
+
+/** Either a readable summary or the failure reason, told apart by `notFound`. */
+type ReadOutcome =
+  | { notFound: string; body?: undefined }
+  | { notFound?: undefined; body: SummaryBody }
 
 /**
  * Validate the plugin-row config and merge it over the defaults. Invalid
@@ -21,8 +61,8 @@ const DEFAULT_CONFIG = { label: 'dsh-stats', timestamp: true, timeZone: DEFAULT_
  * @param config - the plugin row's config value (may be undefined).
  * @returns the effective config.
  */
-function resolveConfig(config) {
-  const source = config ?? {}
+function resolveConfig(config: unknown): EffectiveConfig {
+  const source = (config ?? {}) as PluginRowConfig
   if (typeof source !== 'object' || Array.isArray(source)) {
     throw new Error(`dsh-stats: config must be a mapping, got ${JSON.stringify(source)}`)
   }
@@ -53,13 +93,13 @@ function resolveConfig(config) {
 }
 
 /** One heartbeat reading. */
-function pingBody(config) {
-  const body = { ok: true, plugin: config.label }
+function pingBody(config: EffectiveConfig): { ok: boolean; plugin: string; now?: string } {
+  const body: { ok: boolean; plugin: string; now?: string } = { ok: true, plugin: config.label }
   if (config.timestamp) body.now = new Date().toISOString()
   return body
 }
 
-function servePing(req, res, config) {
+function servePing(req: NodeIncomingMessage, res: NodeServerResponse, config: EffectiveConfig): void {
   if (req.method !== 'GET' && req.method !== 'HEAD') {
     res.writeHead(405, { allow: 'GET, HEAD' })
     res.end()
@@ -74,12 +114,12 @@ function servePing(req, res, config) {
   res.end(req.method === 'HEAD' ? undefined : body)
 }
 
-function messageOf(error) {
+function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
 /** One JSON response with the headers a live reading needs. */
-function json(body, status = 200) {
+function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
@@ -93,14 +133,14 @@ export const inject = ['webServer', 'connection', 'sessionQuery', 'tools']
 /** Cap on cached summaries; the oldest entry is dropped past it. */
 const MEMO_LIMIT = 64
 
-export function apply(ctx, config = {}) {
+export function apply(ctx: DshContext, config: unknown = {}): void {
   const effective = resolveConfig(config)
   ctx.effect(
     () => ctx.webServer.register({ kind: 'exact', path: PING_PATH, handler: (req, res) => servePing(req, res, effective) }),
     'dsh-stats: GET /dsh-stats/ping',
   )
 
-  const memo = new Map()
+  const memo = new Map<string, { body: SummaryBody; dirty: boolean }>()
   ctx.on('session/event', (session, event) => {
     if (event?.type !== 'assistant/message') return
     const entry = memo.get(String(session?.id ?? ''))
@@ -108,8 +148,8 @@ export function apply(ctx, config = {}) {
   })
 
   /** Read one session and fold + price it; `notFound` marks an unreadable session. */
-  const readSummary = async (sessionId) => {
-    let snapshot
+  const readSummary = async (sessionId: string): Promise<ReadOutcome> => {
+    let snapshot: { events?: unknown }
     try {
       snapshot = await ctx.sessionQuery.readSession(sessionId)
     } catch (error) {
@@ -132,7 +172,7 @@ export function apply(ctx, config = {}) {
     }
   }
 
-  const serveSummary = async (request) => {
+  const serveSummary = async (request: Request): Promise<Response> => {
     const requested = new URL(request.url).searchParams.get('session')?.trim() ?? ''
     if (requested.length === 0) {
       return json({ error: 'dsh-stats: session id is required' }, 400)
@@ -141,7 +181,10 @@ export function apply(ctx, config = {}) {
     if (cached !== undefined && cached.dirty !== true) return json(cached.body)
     const outcome = await readSummary(requested)
     if (outcome.notFound !== undefined) return json({ error: outcome.notFound }, 404)
-    if (memo.size >= MEMO_LIMIT) memo.delete(memo.keys().next().value)
+    if (memo.size >= MEMO_LIMIT) {
+      const oldest = memo.keys().next().value
+      if (oldest !== undefined) memo.delete(oldest)
+    }
     memo.set(requested, { body: outcome.body, dirty: false })
     return json(outcome.body)
   }

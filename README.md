@@ -12,6 +12,7 @@ DeepSeek Harness（DSH）的**出仓插件工作区**：这里以独立目录开
 | --- | --- | --- | --- |
 | [`dsh-favicon-triangle/`](dsh-favicon-triangle/README.md) | `favicon-triangle` | 把 Web GUI 的浏览器标签页图标（以及「安装为应用」后的图标）换成三角形，随浅色/深色配色自动反色 | Host 单半边（`webServer` exact 路由） |
 | [`dsh-cost/`](dsh-cost/README.md) | `dsh-cost` | 在 Web GUI 输入框统计行下方加一个「对话费用」胶囊：点击展开面板，显示本次会话费用（按模型、按 token 桶、按高峰/空闲分档）与 DeepSeek 账户余额 | Host 半边（两条 `connection.fetch` 路由）+ Web Client 半边（`conversation.composer.dock` 插槽） |
+| [`dsh-stats/`](dsh-stats/README.md) | `dsh-session-stats` | 在 Web GUI 输入框统计行下方加一个「会话用量」胶囊：点击展开面板，显示本次会话按模型分组的 token 用量与估算费用；另注册 `session_stats` 工具 | Host 半边（`connection.fetch` 路由 + 工具，TypeScript 源码在 `src/`，构建产物统一在 `lib/`、不入库）+ Web Client 半边（`conversation.composer.dock` 插槽） |
 
 各插件的实现原理、全部配置项、构建方式与已知限制，见各自目录下的 README。
 
@@ -32,6 +33,12 @@ dsh-custom/
     ├── src/client/index.tsx     # Web Client 入口（TypeScript + React）
     ├── lib/client.js            # 构建产物：被 /plugins 服务的客户端 bundle（已提交）
     ├── build.mjs                # 用上游 checkout 的 tsc 重新构建 lib/client.js
+    └── test/*.test.mjs
+└── dsh-stats/                   # 插件：会话用量胶囊（dsh-session-stats）
+    ├── src/index.ts             # Host 入口（TypeScript）
+    ├── src/host/                # Host 侧纯函数与最小 ctx 类型声明（TypeScript）
+    ├── lib/                     # 构建产物（.gitignore 忽略，node build.mjs 本地生成）
+    ├── build.mjs                # 用上游 checkout 的 tsc 重建两个半边到 lib/
     └── test/*.test.mjs
 ```
 
@@ -117,6 +124,7 @@ pnpm dsh --profile web --dump-config     # 可见 "# == dsh-favicon-triangle" �
 ```sh
 cd dsh-favicon-triangle && npm test    # node --test，6 项
 cd dsh-cost && npm test                # node --test，40 项
+cd dsh-stats && npm test               # node --test，24 项
 ```
 
 修改 `dsh-cost/src/client/index.tsx` 后需要重建客户端 bundle（`lib/client.js` 已提交，

@@ -1,10 +1,8 @@
 {
-  "extends": "./tsconfig.build.json",
+  "extends": "./tsconfig.host.build.json",
   "compilerOptions": {
-    "noEmit": true
+    "noEmit": true,
+    "jsx": "react"
   },
-  "include": [
-    "src/client/index.tsx",
-    "src/shims.d.ts"
-  ]
+  "include": ["src"]
 }

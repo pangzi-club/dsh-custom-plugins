@@ -37,7 +37,7 @@ dsh-<feature>/
 ├── index.js              # Host 半边入口（ESM）
 ├── host/                 # 可选：Host 侧纯函数，便于脱离 ctx 单测
 ├── src/client/index.tsx  # 可选：Web Client 半边源码（单文件）
-├── lib/client.js         # 可选：客户端构建产物，提交进仓库
+├── lib/client.js         # 可选：客户端构建产物，提交进仓库；host 半边也 TS 化的插件把全部产物统一放 lib/（入口 lib/index.js，见 dsh-stats——其 lib/ 不入库，本机构建）
 ├── build.mjs             # 可选：用上游 tsc 构建 lib/client.js
 ├── cordis.patch.yml      # 可选：bundle 层，供 dsh plugin add 安装
 ├── test/*.test.mjs       # node --test

@@ -5,7 +5,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { summarizeUsage } from '../host/fold.js'
+import { summarizeUsage } from '../lib/host/fold.js'
 
 const TIME = Date.UTC(2026, 8, 11, 2, 0, 0)
 

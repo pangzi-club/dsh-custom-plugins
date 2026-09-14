@@ -9,7 +9,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { apply, inject, name } from '../index.js'
+import { apply, inject, name } from '../lib/index.js'
 
 const PING_PATH = '/dsh-stats/ping'
 const SUMMARY_PATH = '/api/dsh-stats/summary'

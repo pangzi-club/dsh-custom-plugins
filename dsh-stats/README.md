@@ -9,15 +9,20 @@ DSH（DeepSeek Harness）出仓插件：在 Web GUI 输入框统计行下方挂�
 
 ## 原理
 
-- **宿主半边**（`index.js` + `host/fold.js`），`inject: ['webServer', 'connection', 'sessionQuery', 'tools']`：
+- **宿主半边**（`src/index.ts` + `src/host/`，TypeScript 源码；`node build.mjs` 编译为
+  `lib/index.js` + `lib/host/*.js`——构建产物统一住在 `lib/`，已加入 `.gitignore` 不入库，
+  本机构建本地用；profile patch 与测试都指向产物路径），
+  `inject: ['webServer', 'connection', 'sessionQuery', 'tools']`：
   - `webServer` exact 路由 `GET /dsh-stats/ping`：JSON 心跳，验证插件挂载与路由存活；
   - `connection.fetch` 已鉴权路由 `GET /api/dsh-stats/summary?session=<id>`：
     `sessionQuery.readSession` 读会话事件日志，`summarizeUsage` 把逐条 `assistant/message`
     样本按 `message.source` 的模型路由折叠成四个 token 桶、并按样本时间戳划分
-    高峰/空闲档，`host/pricing.js` 再按有效价格表逐档计价（缓存写入按未缓存输入计费）；
+    高峰/空闲档，`src/host/pricing.ts` 再按有效价格表逐档计价（缓存写入按未缓存输入计费）；
     结果按会话缓存，`session/event`（`assistant/message`）落盘后标脏、下次请求重算；
   - `tools`：注册 `session_stats` 工具（裸 JSON Schema 定义、参数自校验），另有两个
-    `tools/pre-execute` 监听（调用日志、超长 session id 拒绝）。
+    `tools/pre-execute` 监听（调用日志、超长 session id 拒绝）；
+  - DSH 宿主的 `ctx`/Node 请求响应类型无法从出仓位置 import，由
+    `src/host/context.d.ts` 提供最小结构化声明（与客户端 `src/shims.d.ts` 同一手法）。
 - **客户端半边**（`src/client/index.tsx` → 构建为 `lib/client.js`）：向
   `conversation.composer.dock` 席位注入条目（id `dsh-stats`）；`tokenUsage` 投影非零才渲染；
   取数防抖、面板定位与点外关闭复用 `@deepseek-ai/dsh-client-ui-primitives`；词表 zh/en。
@@ -39,7 +44,7 @@ DSH（DeepSeek Harness）出仓插件：在 Web GUI 输入框统计行下方挂�
 ```yaml
 - insert:
     - id: stats
-      name: '/absolute/path/to/dsh-custom/dsh-stats/index.js'
+      name: '/absolute/path/to/dsh-custom/dsh-stats/lib/index.js'
       config:
         label: my-stats
         timeZone: Asia/Shanghai
@@ -57,7 +62,7 @@ DSH（DeepSeek Harness）出仓插件：在 Web GUI 输入框统计行下方挂�
 ```yaml
 - insert:
     - id: stats
-      name: '/absolute/path/to/dsh-custom/dsh-stats/index.js'
+      name: '/absolute/path/to/dsh-custom/dsh-stats/lib/index.js'
       config:
         label: my-stats
 ```
@@ -69,7 +74,9 @@ pnpm dsh plugin --profile web add dsh-session-stats
 ```
 
 方式 C：git 子目录安装（本仓库根是插件集合、不是单包，需用 pnpm 的 `#path:` 写法指向
-插件目录）：
+插件目录）。注意 `lib/` 不入库：git 渠道装到的包没有构建产物，而构建又依赖本机的上游
+checkout（`.dsh-repo`/`DSH_REPO`），因此 git 渠道只适合本仓库协作者；对外分发用方式 B
+（npm 包在发布前已 `node build.mjs`，产物随 tarball 走）：
 
 ```sh
 pnpm dsh plugin --profile web add 'github:pangzi-club/dsh-custom-plugins#path:dsh-stats'
@@ -81,10 +88,14 @@ pnpm dsh plugin --profile web add 'github:pangzi-club/dsh-custom-plugins#path:ds
 ## 测试
 
 ```sh
-npm test    # node --test，22 项，零依赖、不打网络
+npm test    # node --test，24 项，零依赖、不打网络
 ```
 
-修改 `src/client/` 后先 `node build.mjs` 再跑测试（bundle 测试会执行 `lib/client.js`）。
+修改 `src/` 下任意源码后先 `node build.mjs` 再跑测试：两个半边的产物统一重建到 `lib/`
+（宿主 `lib/index.js` + `lib/host/`、客户端 `lib/client.js`），测试执行的是产物
+（bundle 测试会执行 `lib/client.js`）。`lib/` 在 `.gitignore` 里，改源码不产生 git 噪音；
+换机器或新 clone 后需要先配置 `.dsh-repo`（或 `DSH_REPO`）并跑一次 `node build.mjs`，
+插件才有产物可加载。
 
 ## 已知限制
 

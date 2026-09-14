@@ -1,11 +1,11 @@
 {
   "name": "dsh-session-stats",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "DSH Web GUI plugin: session usage stats",
   "type": "module",
-  "main": "index.js",
+  "main": "lib/index.js",
   "exports": {
-    ".": "./index.js",
+    ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
@@ -18,9 +18,7 @@
     }
   },
   "files": [
-    "index.js",
-    "host",
-    "lib/client.js",
+    "lib",
     "cordis.patch.yml"
   ],
   "scripts": {

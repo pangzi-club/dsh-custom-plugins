@@ -6,7 +6,7 @@
 
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { apply, inject, name } from '../index.js'
+import { apply, inject, name } from '../lib/index.js'
 
 const SUMMARY_ROUTE = '/api/dsh-stats/summary'
 

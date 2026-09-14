@@ -41,9 +41,9 @@
   "version": "0.1.0",
   "description": "DSH Web GUI plugin: session usage stats",
   "type": "module",
-  "main": "index.js",
+  "main": "lib/index.js",
   "exports": {
-    ".": "./index.js",
+    ".": "./lib/index.js",
     "./client": "./lib/client.js",
     "./package.json": "./package.json"
   },
@@ -51,7 +51,7 @@
     "client": { "platform": "web" },
     "bundle": { "patch": "./cordis.patch.yml" }
   },
-  "files": ["index.js", "host", "lib/client.js", "cordis.patch.yml"],
+  "files": ["lib", "cordis.patch.yml"],
   "scripts": {
     "build": "node build.mjs",
     "test": "node --test test/*.test.mjs"
@@ -63,8 +63,8 @@
 
 - `dsh.bundle.patch` 指向包内 patch 层——**这是「可安装」的开关**：安装器只把声明了它的
   依赖认作 DSH bundle；
-- `files` 列出发布内容：宿主入口、`host/`、已构建的客户端 bundle、patch 层。源码与测试
-  不必发布；
+- `files` 列出发布内容：构建产物目录 `lib/`（宿主入口 `lib/index.js`、`lib/host/`、
+  客户端 bundle `lib/client.js`）与 patch 层。源码与测试不必发布；
 - `dsh.client` 与 `exports["./client"]` 原样保留——bundle 化不影响客户端半边的声明；
 - `"private": true` 是开发期的防误发护栏（`npm publish` 会直接拒绝）；真要发布时移除它，
   见 §5。
@@ -149,8 +149,8 @@ tarball 是一次性渠道，git 有 `allowBuilds` 门槛；要让 `dsh plugin a
 `package.json` 做三处改动：
 
 - **移除 `"private": true`**——它是 §2 加的防误发护栏，发布时必须去掉；
-- 核对 `files` 四项齐全（`index.js`、`host`、`lib/client.js`、`cordis.patch.yml`）：npm 按
-  `files` **白名单**打包，缺一项消费者那边就少一块功能；
+- 核对 `files` 齐全（`lib`、`cordis.patch.yml`）：npm 按 `files` **白名单**打包，缺一项
+  消费者那边就少一块功能；
 - 补 `repository`、`keywords` 等元数据（可选，利于被发现）。包名先在 npmjs.com 查重；
   用作用域名（如 `@you/dsh-stats`）可以彻底避让，但首次发布要 `--access public`，安装
   命令也要带作用域。
@@ -172,11 +172,14 @@ npm pack                              # 产出 dsh-stats-0.1.0.tgz，不碰 npm 
 tar -tzf dsh-stats-0.1.0.tgz
 ```
 
-清单里应该看到 `package/` 下的 `index.js`、`host/`、`lib/client.js`、`cordis.patch.yml`
-（`package.json` 与 `README.md` npm 总会自动带上；`LICENSE` 文件存在时也会一并带上，
-没有就不出现——只声明 `license` 字段不带文件是合法的）。**如果列表里没有
-`lib/client.js`，停下来查 `files`，不要发。** 顺带：这个 tgz 正是 §4 表里 tarball 渠道的
-产物，可以先 `dsh plugin add ./dsh-stats-0.1.0.tgz` 自测一轮再正式发布。
+清单里应该看到 `package/lib/` 下的 `index.js`、`host/`、`client.js`，以及
+`package/cordis.patch.yml`（`package.json` 与 `README.md` npm 总会自动带上；`LICENSE`
+文件存在时也会一并带上，没有就不出现——只声明 `license` 字段不带文件是合法的）。
+**如果列表里没有 `lib/client.js`，停下来查 `files`，不要发。** 另一个同类的坑：
+`npm pack` 会把 `.gitignore` 当排除依据——`dsh-stats` 的 `lib/` 整目录在 `.gitignore`
+里（产物不入库），需要一个不含 `lib/` 的 `.npmignore`（存在时 npm 完全改用它、不再看
+`.gitignore`），否则 tarball 里根本不会出现构建产物。顺带：这个 tgz 正是 §4 表里
+tarball 渠道的产物，可以先 `dsh plugin add ./dsh-stats-0.1.0.tgz` 自测一轮再正式发布。
 
 ### 5.3 登录并发布
 
