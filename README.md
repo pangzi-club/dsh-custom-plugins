@@ -4,7 +4,8 @@ DeepSeek Harness（DSH）的**出仓插件工作区**：这里以独立目录开
 **不修改上游 `deepseek-harness` 仓库的任何文件**。每个插件只通过 DSH 已发布的扩展点
 （`webServer` 路由、`connection.fetch` 已鉴权路由、Web Client 插槽等）接入，因此可以
 单独启用、单独关闭，升级 DSH 时不需要给仓库打补丁。开发约定见 [`AGENTS.md`](AGENTS.md)。想动手写插件，从
-[`docs/tutorial/`](docs/tutorial/README.md) 的由浅入深教程开始。
+[`docs/tutorial/`](docs/tutorial/README.md) 的由浅入深教程开始；进阶篇（事件管线、LLM
+观测、live 客户端）见 [`docs/tutorial2/`](docs/tutorial2/README.md)。
 
 ## 插件一览
 
@@ -22,7 +23,8 @@ DeepSeek Harness（DSH）的**出仓插件工作区**：这里以独立目录开
 dsh-custom/
 ├── README.md                    # 本文件：插件清单与使用方式
 ├── AGENTS.md                    # 在本工作区新建/修改插件的约定（含「不改上游源码」红线）
-├── docs/tutorial/               # 由浅入深的出仓插件开发教程
+├── docs/tutorial/               # 由浅入深的出仓插件开发教程（第一辑：基础）
+├── docs/tutorial2/              # 进阶教程（第二辑：事件管线、LLM 观测、live 客户端）
 ├── dsh-favicon-triangle/        # 插件：三角形 favicon
 │   ├── index.js                 # Host 入口：注册 GET/HEAD /favicon.svg
 │   ├── cordis.patch.yml         # bundle 层：供 dsh plugin add 安装

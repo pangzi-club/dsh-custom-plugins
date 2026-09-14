@@ -46,16 +46,18 @@
 | [01 · 心智模型](01-mental-model.md) | 微内核与 Cordis 契约；出仓 vs 仓内；加载链路与生效语义 | — | ★ |
 | [02 · 第一个插件](02-first-plugin.md) | `dsh-stats` v1：exact 路由、挂载、验证、最小测试 | `webServer` | ★ |
 | [03 · 配置与生效](03-config-reload.md) | 插件行 config、fail-loudly 校验、live 重载的边界 | — | ★ |
-| [04 · 已鉴权 API 与会话数据](04-host-api.md) | v2：`connection.fetch` 路由、`sessionQuery` 折叠、缓存失效、凭据 | `connection.fetch`、`sessionQuery`、`session/event`、`credentials` | ★★ |
-| [05 · Web 客户端半边](05-web-client.md) | v3：slots/locale、单文件 TSX、构建链与 ModuleLoader 信封 | 客户端 `slots`、`locale` | ★★★ |
-| [06 · 工具与事件](06-tools-events.md) | v4：裸 ToolDefinition、`tools/pre-execute` 瀑布 | `tools`、`tools/*` | ★★ |
+| [04 · 已鉴权 API 与会话数据](04-host-api.md) | v3：`connection.fetch` 路由、`sessionQuery` 折叠、缓存失效、凭据 | `connection.fetch`、`sessionQuery`、`session/event`、`credentials` | ★★ |
+| [05 · Web 客户端半边](05-web-client.md) | v4：slots/locale、单文件 TSX、构建链与 ModuleLoader 信封 | 客户端 `slots`、`locale` | ★★★ |
+| [06 · 工具与事件](06-tools-events.md) | v5：裸 ToolDefinition、`tools/pre-execute` 瀑布 | `tools`、`tools/*` | ★★ |
 | [07 · 测试](07-testing.md) | 零依赖三层金字塔：纯函数 / fakeCtx 编排 / vm bundle | — | ★★ |
-| [08 · 打包与分发](08-packaging.md) | v5：bundle 三件套、`dsh plugin add`、发布到 npm | `dsh.bundle` | ★★ |
+| [08 · 打包与分发](08-packaging.md) | v6：bundle 三件套、`dsh plugin add`、发布到 npm | `dsh.bundle` | ★★ |
 | [09 · 附录：速查表](09-reference.md) | seam / 席位 / 生效语义 / 坑 / 上游文档地图 | 全部 | 查阅 |
 
 扩展点的**验证状态**贯穿全教程：`webServer`、`connection.fetch`、`sessionQuery`、
 `credentials`、`slots`、`locale` 已被本仓库两个真实插件验证；`tools` 一章依据上游文档
-（章内有醒目声明）。
+（章内有醒目声明）。想继续深入（事件管线实战、LLM 调用观测、live 客户端），接着读第二辑
+[`docs/tutorial2/`](../tutorial2/README.md)——它的代码整体采用第 6 章的做法：依据上游
+文档与源码签名撰写，未经本工作区实测。
 
 ## 约定
 
