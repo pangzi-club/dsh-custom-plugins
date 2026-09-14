@@ -147,6 +147,9 @@ import 区加一行，`apply` 里加路由与缓存：
 import { summarizeUsage } from './host/fold.js'
 ```
 
+ESM 的相对 import **必须带 `.js` 扩展名**：漏掉会在插件加载时得到
+`ERR_MODULE_NOT_FOUND`（编辑器的自动导入经常帮你抹掉它，留意）。
+
 `inject` 扩为三个服务：
 
 ```js

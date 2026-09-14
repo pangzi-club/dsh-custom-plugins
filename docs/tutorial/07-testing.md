@@ -393,7 +393,7 @@ test('injects its stylesheet once and registers the dock entry', () => {
   assert.equal(registered.seat, 'conversation.composer.dock')
   assert.deepEqual(plain(registered.options), {
     name: 'conversation.composer.dock',
-    id: 'stats',
+    id: 'dsh-stats',
     order: 1,
     locale: 'dsh-stats',
   })

@@ -96,6 +96,10 @@ Component))` 向席位贡献组件（自带回收，不包 `ctx.effect`；`local
 - **配置改了没生效** → `config` 覆写是**整体替换**不深合并，想改一个键要写全整块。
 - **`turn/*` 监听不工作** → 那是 `session/event` 的类型不是 Cordis 事件，监听
   `ctx.on('session/event', (s, e) => e.type === 'turn/end' && …)`。
+- **API 返回没见过的空体 400** → webServer 对任何 handler 异常的最后兜底就是**空体 400**
+  （不是 500）；真实的堆栈在 `dsh web` 终端日志里（warning 一条），先去看日志再改代码。
+- **插件加载失败 `already has an entry with id …`** → list 席位的条目 `id` 是席位内唯一键，
+  撞了内建条目或其它插件；换成唯一 id（直接用插件名最稳）。
 - **胶囊挤不进统计行** → `conversation.composer.dock` 是纵向 flex 列，新条目只能是另一行；
   这是核心布局，出仓插件改不了，写进 README 已知限制。
 - **面板开着但内建胶囊没收回** → 互斥状态归壳所有，插件间无协调点；已知限制。

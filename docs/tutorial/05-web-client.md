@@ -424,7 +424,7 @@ export function apply(ctx: any): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'dsh-stats: locale')
   ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
     name: 'conversation.composer.dock',
-    id: 'stats',
+    id: 'dsh-stats',
     order: 1,
     locale: NS,
   }, StatsPill))
@@ -440,7 +440,9 @@ export function apply(ctx: any): void {
   `conversation.composer.dock` 是输入框统计行所在的列表席位（更多席位见附录速查表）。
   `contribute` 在席位挂载时执行（并会在重挂载时重跑），里面用 `ctx.slots.register`
   注册 `{ name, id, order, locale }` 与组件；它**自带回收**，所以不包 `ctx.effect`
-  （对照：`locale.register` 返回注销函数，要包）。
+  （对照：`locale.register` 返回注销函数，要包）。**`id` 是席位内的唯一键**：内建统计行
+  在这条席位上已经占用了 `stats`，插件条目直接用插件名（`dsh-stats`）最稳——撞车时后
+  加载的一方会报 `already has an entry with id …` 并整个包加载失败。
 
 组件侧三个值得注意的设计（都是 `dsh-cost` 验证过的做法）：
 
@@ -483,10 +485,75 @@ export function apply(ctx: any): void {
 }
 ```
 
-**`dsh-stats/src/shims.d.ts`**——出仓解析不到真的 React 类型包，用最小环境声明兜底（只
-覆盖用到的面；仅构建期使用，不进产物）。内容照抄
-[`dsh-cost/src/shims.d.ts`](../../dsh-cost/src/shims.d.ts) 即可（`react`、`react-dom`、
-`@deepseek-ai/dsh-client-ui-primitives` 三块 `declare module` 加一个宽松的 `JSX` 命名空间）。
+**`dsh-stats/tsconfig.json`**——给编辑器的入口。IDE 的 TS 语言服务只会自动拾取名为
+`tsconfig.json` 的配置，`tsconfig.build.json` 对它**不可见**；没有这份文件时，打开
+`index.tsx` 会被当成无配置的孤立项目——垫片不加载（`TS2307` 找不到模块）、JSX 命名空间
+缺失（`TS7026` 满屏红）。让前者 extends 后者即可，`build.mjs` 仍使用构建配置：
+
+```json
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": { "noEmit": true },
+  "include": ["src/client/index.tsx", "src/shims.d.ts"]
+}
+```
+
+**`dsh-stats/src/shims.d.ts`**——出仓解析不到真的 React 类型包，tsc 会对三个裸 import 报
+`TS2307: Cannot find module`；这个文件用最小环境声明兜底（只覆盖用到的面；仅构建期使用，
+不进产物）：
+
+```ts
+/**
+ * Minimal ambient types for the browser half's platform imports.
+ *
+ * The plugin is built outside the repository workspace, so the real React and
+ * primitives type packages are not resolvable from here; these declarations
+ * cover exactly the surface `src/client/index.tsx` uses. They are build-time
+ * only and never shipped in the bundle.
+ */
+
+declare module 'react' {
+  export type ReactNode = any
+  export type CSSProperties = Record<string, string | number | undefined>
+  export type MutableRefObject<T> = { current: T }
+  export function createElement(type: any, props?: any, ...children: any[]): any
+  export function useState<T>(initial: T | (() => T)): [T, (value: T | ((prev: T) => T)) => void]
+  export function useEffect(effect: () => void | (() => void) | undefined, deps?: readonly unknown[]): void
+  export function useRef<T>(initial: T | null): MutableRefObject<T | null>
+  export function useMemo<T>(factory: () => T, deps: readonly unknown[]): T
+  export function useCallback<T>(callback: T, deps: readonly unknown[]): T
+  export const Fragment: any
+}
+
+declare module 'react-dom' {
+  export function createPortal(children: any, container: any, key?: string | null): any
+}
+
+declare module '@deepseek-ai/dsh-client-ui-primitives' {
+  export function useAnchoredPosition(options: {
+    open: boolean
+    anchorRef: any
+    panelRef: any
+    side: 'top' | 'bottom'
+    gap: number
+    margin: number
+  }): any
+  export function useDismissOnOutsidePointer(
+    rootRef: any,
+    open: boolean,
+    setOpen: (open: boolean) => void,
+    panelRef?: any,
+  ): void
+}
+
+declare namespace JSX {
+  type Element = any
+  interface IntrinsicElements { [name: string]: any }
+}
+```
+
+组件以后用到新的基线 API（比如 `React.useReducer`）时，记得回来给对应的 `declare module`
+补一条声明——垫片只覆盖「用到的面」。
 
 **`dsh-stats/build.mjs`**——解析上游 checkout、跑 `tsc`、把产物包进信封：
 
@@ -606,6 +673,9 @@ window.__ModuleLoader__.load({
 
 ## 6. 本章专属坑清单
 
+- **席位条目 `id` 撞车**：list 席位的 `id` 全席位唯一，`conversation.composer.dock` 上内建
+  统计行已占用 `stats`；插件条目用插件名（`dsh-stats`）可避免撞上内建或其它插件，否则后
+  加载的一方整个包加载失败（报 `already has an entry with id …`）；
 - **`conversation.composer.dock` 是纵向 flex 列**：你的条目只能是统计行**下方的另一行**，
   无法紧贴某个已有胶囊。想改布局就是改核心——不做，README 的「已知限制」里写明即可；
 - **zh/en 键集合必须一致**：`locale.register` 的两个词表键不齐会在加载时报错，
