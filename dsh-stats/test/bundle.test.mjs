@@ -99,7 +99,7 @@ function plain(value) {
 
 test('presents the loader envelope with the package identity', () => {
   const { row, exports } = loadBundle()
-  assert.equal(row.id, 'dsh-stats')
+  assert.equal(row.id, 'dsh-session-stats')
   assert.equal(typeof row.factory, 'function')
   assert.equal(exports.name, 'dsh-stats')
   assert.deepEqual(plain(exports.inject), ['slots', 'locale'])

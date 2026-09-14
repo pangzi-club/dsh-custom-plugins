@@ -50,7 +50,7 @@
 | [05 · Web 客户端半边](05-web-client.md) | v3：slots/locale、单文件 TSX、构建链与 ModuleLoader 信封 | 客户端 `slots`、`locale` | ★★★ |
 | [06 · 工具与事件](06-tools-events.md) | v4：裸 ToolDefinition、`tools/pre-execute` 瀑布 | `tools`、`tools/*` | ★★ |
 | [07 · 测试](07-testing.md) | 零依赖三层金字塔：纯函数 / fakeCtx 编排 / vm bundle | — | ★★ |
-| [08 · 打包与分发](08-packaging.md) | v5：bundle 三件套、`dsh plugin add`、渠道与安全 | `dsh.bundle` | ★★ |
+| [08 · 打包与分发](08-packaging.md) | v5：bundle 三件套、`dsh plugin add`、发布到 npm | `dsh.bundle` | ★★ |
 | [09 · 附录：速查表](09-reference.md) | seam / 席位 / 生效语义 / 坑 / 上游文档地图 | 全部 | 查阅 |
 
 扩展点的**验证状态**贯穿全教程：`webServer`、`connection.fetch`、`sessionQuery`、

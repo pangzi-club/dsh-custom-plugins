@@ -65,7 +65,9 @@
   依赖认作 DSH bundle；
 - `files` 列出发布内容：宿主入口、`host/`、已构建的客户端 bundle、patch 层。源码与测试
   不必发布；
-- `dsh.client` 与 `exports["./client"]` 原样保留——bundle 化不影响客户端半边的声明。
+- `dsh.client` 与 `exports["./client"]` 原样保留——bundle 化不影响客户端半边的声明；
+- `"private": true` 是开发期的防误发护栏（`npm publish` 会直接拒绝）；真要发布时移除它，
+  见 §5。
 
 **其三，README**。一个要分发的插件必须有像样的 README（这也是本工作区的硬约定，见
 [`AGENTS.md`](../../AGENTS.md)），六个段落一个不能少：
@@ -121,7 +123,7 @@ pnpm dsh plugin --profile web remove dsh-stats
 | --- | --- | --- |
 | 本地目录 | `dsh plugin add /path/to/dsh-stats` | 开发期最顺手；升级靠 `pnpm update` 或重装 |
 | tarball | `dsh plugin add ./dsh-stats-0.1.0.tgz`（先 `npm pack`） | 不需要发布基础设施 |
-| npm | 发布后 `dsh plugin add dsh-stats` | `files` 字段决定包内容；`lib/client.js` 必须随包发布 |
+| npm | 发布后 `dsh plugin add dsh-stats` | `files` 字段决定包内容；`lib/client.js` 必须随包发布（实操见下节） |
 | git | `dsh plugin add github:you/dsh-stats` | 见下 |
 
 git 渠道有个**安全闸**：如果包用 `prepare` 脚本在安装时自建（出仓插件常见——装完跑
@@ -130,7 +132,78 @@ git 渠道有个**安全闸**：如果包用 `prepare` 脚本在安装时自建�
 麻烦——install 期脚本就是任意代码执行，用户应当有意识地放行。绕开它的正路：发布前把
 `lib/client.js` 构建好随包分发（`dsh-cost` 与本教程的做法），让消费者完全不需要构建。
 
-## 5. 发布前清单（Definition of Done）
+另一个 git 渠道的常见形态：**仓库根不是单包**（比如一个插件集合 / monorepo）。这时要
+用 pnpm 的子目录写法把插件目录指出来，否则 pnpm 会把仓库根当包安装：
+
+```sh
+pnpm dsh plugin --profile web add 'github:you/dsh-custom-plugins#path:dsh-stats'
+```
+
+## 5. 实操：发布到 npm
+
+tarball 是一次性渠道，git 有 `allowBuilds` 门槛；要让 `dsh plugin add dsh-stats` 在**任何**
+装了 DSH 的机器上直接可用，npm 是主渠道。五步：
+
+### 5.1 调整发布姿态
+
+`package.json` 做三处改动：
+
+- **移除 `"private": true`**——它是 §2 加的防误发护栏，发布时必须去掉；
+- 核对 `files` 四项齐全（`index.js`、`host`、`lib/client.js`、`cordis.patch.yml`）：npm 按
+  `files` **白名单**打包，缺一项消费者那边就少一块功能；
+- 补 `repository`、`keywords` 等元数据（可选，利于被发现）。包名先在 npmjs.com 查重；
+  用作用域名（如 `@you/dsh-stats`）可以彻底避让，但首次发布要 `--access public`，安装
+  命令也要带作用域。
+
+可选护栏：发布前钩子，测试不绿就发不出去。
+
+```json
+"scripts": {
+  "build": "node build.mjs",
+  "test": "node --test test/*.test.mjs",
+  "prepublishOnly": "npm test"
+}
+```
+
+### 5.2 干跑：先看包里到底有什么
+
+```sh
+npm pack                              # 产出 dsh-stats-0.1.0.tgz，不碰 npm registry
+tar -tzf dsh-stats-0.1.0.tgz
+```
+
+清单里应该看到 `package/` 下的 `index.js`、`host/`、`lib/client.js`、`cordis.patch.yml`
+（`package.json` 与 `README.md` npm 总会自动带上；`LICENSE` 文件存在时也会一并带上，
+没有就不出现——只声明 `license` 字段不带文件是合法的）。**如果列表里没有
+`lib/client.js`，停下来查 `files`，不要发。** 顺带：这个 tgz 正是 §4 表里 tarball 渠道的
+产物，可以先 `dsh plugin add ./dsh-stats-0.1.0.tgz` 自测一轮再正式发布。
+
+### 5.3 登录并发布
+
+```sh
+npm whoami        # 未登录会提示
+npm login         # 浏览器完成 npm 账号登录
+npm publish       # 作用域包首次：npm publish --access public
+```
+
+### 5.4 装回来验证
+
+发布者应当第一个消费自己：
+
+```sh
+cd /path/to/deepseek-harness
+pnpm dsh plugin --profile web add dsh-stats
+pnpm dsh --profile web --dump-config     # 出现 "# == dsh-stats" 层
+# 重启 dsh web，GUI 里过一遍 §3 的验证清单
+```
+
+### 5.5 版本迭代
+
+改代码后：`node build.mjs` → `npm test` → `npm version patch`（或 `minor`/`major`，它会
+更新版本号并打 git tag）→ `npm publish`。消费者拿新版：`pnpm dsh plugin --profile web
+remove dsh-stats` 后重新 `add`，或直接 `add dsh-stats@<版本>`。
+
+## 6. 发布前清单（Definition of Done）
 
 从[`AGENTS.md`](../../AGENTS.md)的完成标准改写成教程版，`dsh-stats` 收尾时逐项打勾：
 

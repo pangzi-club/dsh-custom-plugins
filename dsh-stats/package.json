@@ -1,5 +1,5 @@
 {
-  "name": "dsh-stats",
+  "name": "dsh-session-stats",
   "version": "0.1.0",
   "description": "DSH Web GUI plugin: session usage stats",
   "type": "module",
@@ -12,11 +12,31 @@
   "dsh": {
     "client": {
       "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
+  "files": [
+    "index.js",
+    "host",
+    "lib/client.js",
+    "cordis.patch.yml"
+  ],
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "npm test"
   },
-  "private": true
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/pangzi-club/dsh-custom-plugins.git",
+    "directory": "dsh-stats"
+  },
+  "license": "MIT"
 }

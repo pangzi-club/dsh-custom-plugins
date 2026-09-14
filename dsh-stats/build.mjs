@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
-const packageName = 'dsh-stats'
+const packageName = 'dsh-session-stats'
 
 /**
  * Resolve the checkout that provides `tsc`: env first, then the local pointer
