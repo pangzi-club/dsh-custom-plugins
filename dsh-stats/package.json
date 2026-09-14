@@ -1,0 +1,14 @@
+{
+  "name": "dsh-stats",
+  "version": "0.1.0",
+  "description": "DSH Web GUI plugin: session usage stats",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "private": true
+}
