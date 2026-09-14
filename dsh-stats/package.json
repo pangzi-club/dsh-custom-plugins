@@ -16,7 +16,7 @@
   },
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test test/*.test.js"
+    "test": "node --test test/*.test.mjs"
   },
   "private": true
 }
