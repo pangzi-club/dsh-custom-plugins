@@ -1,4 +1,4 @@
-import { summarizeUsage } from "./host/fold"
+import { summarizeUsage } from './host/fold.js'
 
 /**
  * dsh-stats - session usage statistics fro the Web GUI (Host half, v1).
@@ -55,6 +55,18 @@ function servePing(req, res, config) {
     'cache-control': 'no-store',
   })
   res.end(req.method === 'HEAD' ? undefined : body)
+}
+
+function messageOf(error) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+/** One JSON response with the headers a live reading needs. */
+function json(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' },
+  })
 }
 
 export const name = 'dsh-stats'

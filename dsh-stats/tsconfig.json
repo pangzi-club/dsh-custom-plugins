@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.build.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": [
+    "src/client/index.tsx",
+    "src/shims.d.ts"
+  ]
+}

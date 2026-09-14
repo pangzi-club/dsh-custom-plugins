@@ -5,9 +5,17 @@
   "type": "module",
   "main": "index.js",
   "exports": {
-    ".": "./index.js"
+    ".": "./index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "platform": "web"
+    }
   },
   "scripts": {
+    "build": "node build.mjs",
     "test": "node --test test/*.test.js"
   },
   "private": true
