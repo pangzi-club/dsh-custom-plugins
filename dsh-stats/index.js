@@ -1,3 +1,5 @@
+import { summarizeUsage } from "./host/fold"
+
 /**
  * dsh-stats - session usage statistics fro the Web GUI (Host half, v1).
  * 
@@ -57,12 +59,59 @@ function servePing(req, res, config) {
 
 export const name = 'dsh-stats'
 
-export const inject = ['webServer']
+export const inject = ['webServer', 'connection', 'sessionQuery']
+
+/** Cap on cached summaries; the oldest entry is dropped past it. */
+const MEMO_LIMIT = 64
 
 export function apply(ctx, config = {}) {
   const effective = resolveConfig(config)
   ctx.effect(
     () => ctx.webServer.register({ kind: 'exact', path: PING_PATH, handler: (req, res) => servePing(req, res, effective) }),
     'dsh-stats: GET /dsh-stats/ping',
+  )
+
+  const memo = new Map()
+  ctx.on('session/event', (session, event) => {
+    if (event?.type !== 'assistant/message') return
+    const entry = memo.get(String(session?.id ?? ''))
+    if (entry !== undefined) entry.dirty = true
+  })
+
+  const serveSummary = async (request) => {
+    const requested = new URL(request.url).searchParams.get('session')?.trim() ?? ''
+    if (requested.length === 0) {
+      return json({ error: 'dsh-stats: session id is required' }, 400)
+    }
+    const cached = memo.get(requested)
+    if (cached !== undefined && cached.dirty !== true) return json(cached.body)
+    let snapshot
+    try {
+      snapshot = await ctx.sessionQuery.readSession(requested)
+    } catch (error) {
+      return json({ error: `dsh-stats: ${messageOf(error)}` }, 404)
+    }
+    const fold = summarizeUsage(snapshot.events)
+    const body = {
+      sessionId: requested,
+      label: effective.label,
+      routes: fold.rows,
+      totals: fold.totals,
+      samples: fold.samples,
+      skipped: fold.skipped,
+    }
+    if (memo.size >= MEMO_LIMIT) memo.delete(memo.keys().next().value)
+    memo.set(requested, { body, dirty: false })
+    return json(body)
+  }
+
+  ctx.effect(
+    () => ctx.connection.fetch.register({
+      path: '/api/dsh-stats/summary',
+      methods: ['GET'],
+      requestBody: 'buffered',
+      fetch: serveSummary,
+    }),
+    'dsh-stats: GET /api/dsh-stats/summary',
   )
 }
