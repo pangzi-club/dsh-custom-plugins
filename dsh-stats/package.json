@@ -1,6 +1,6 @@
 {
   "name": "dsh-session-stats",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "DSH Web GUI plugin: session usage stats",
   "type": "module",
   "main": "index.js",

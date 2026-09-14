@@ -29,6 +29,9 @@ const zh: Record<string, string> = {
   'dialog.cacheRead': '缓存命中',
   'dialog.cacheWrite': '缓存写入',
   'dialog.output': '输出',
+  'dialog.peak': '高峰',
+  'dialog.idle': '空闲',
+  'dialog.unpriced': '未配置价格',
   'dialog.samples': '{samples} 个计费样本 · 跳过 {skipped} 个',
   'dialog.empty': '本次会话还没有用量记录',
   'dialog.error': '读取失败：{message}',
@@ -43,6 +46,9 @@ const en: Record<string, string> = {
   'dialog.cacheRead': 'Cache hit',
   'dialog.cacheWrite': 'Cache write',
   'dialog.output': 'Output',
+  'dialog.peak': 'Peak',
+  'dialog.idle': 'Idle',
+  'dialog.unpriced': 'No configured price',
   'dialog.samples': '{samples} billed samples · {skipped} skipped',
   'dialog.empty': 'This session has no usage yet',
   'dialog.error': 'Read failed: {message}',
@@ -181,6 +187,16 @@ function formatExact(value: number): string {
   return value.toLocaleString('en-US')
 }
 
+/**
+ * Money text: two decimals at or above one cent, four below, currency-symbol
+ * first when the currency is known.
+ */
+function formatMoney(amount: number, currency: string): string {
+  const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency} `
+  const abs = Math.abs(amount)
+  return `${symbol}${amount.toFixed(abs !== 0 && abs < 0.01 ? 4 : 2)}`
+}
+
 interface Reading {
   status: 'idle' | 'loading' | 'ready' | 'error'
   body?: any
@@ -261,12 +277,17 @@ function StatsPill(props: StatsPillProps): unknown {
   if (!hasTokens) return null
   const body = stats.body
   const totals = body?.totals ?? {}
+  const tierOf = (key: string): number => (body?.routes ?? []).reduce(
+    (total: number, route: any) => total + (route[key] ?? 0), 0,
+  )
   const grand = (body?.routes ?? []).reduce(
     (sum: number, route: any) => sum + route.uncachedInputTokens + route.cacheReadTokens
       + route.cacheWriteTokens + route.outputTokens,
     0,
   )
-  const amountText = body !== undefined ? formatTokens(grand) : '…'
+  const tokensText = body !== undefined ? formatTokens(grand) : '…'
+  const moneyText = body?.priced === true ? formatMoney(body.total, body.currency) : undefined
+  const pillText = moneyText !== undefined ? `${tokensText} · ${moneyText}` : tokensText
 
   return (
     <div className="dsh-stats-root" data-dsh-stats>
@@ -276,11 +297,11 @@ function StatsPill(props: StatsPillProps): unknown {
           className="dsh-stats-pill"
           aria-haspopup="dialog"
           aria-expanded={open}
-          aria-label={t('pill.aria', { tokens: amountText })}
+          aria-label={t('pill.aria', { tokens: tokensText })}
           onClick={() => { setOpen(!open) }}
         >
           <StatsIcon />
-          <span>{amountText}</span>
+          <span>{pillText}</span>
         </button>
         {open && createPortal(
           <div
@@ -292,7 +313,7 @@ function StatsPill(props: StatsPillProps): unknown {
           >
             <div className="dsh-stats-title">
               <span className="dsh-stats-titleLabel"><StatsIcon />{t('dialog.title')}</span>
-              <span className="dsh-stats-titleValue">{stats.status === 'error' ? '—' : amountText}</span>
+              <span className="dsh-stats-titleValue">{stats.status === 'error' ? '—' : pillText}</span>
             </div>
             <div className="dsh-stats-rule" aria-hidden />
             {stats.status === 'error' && (
@@ -304,14 +325,20 @@ function StatsPill(props: StatsPillProps): unknown {
             {stats.status !== 'error' && grand === 0 && (
               <div className="dsh-stats-note">{t('dialog.empty')}</div>
             )}
-            {stats.status !== 'error' && grand > 0 && (
+            {stats.status !== 'error' && (grand > 0 || (body?.unpriced ?? []).length > 0) && (
               <dl className="dsh-stats-details">
                 <dt>{t('dialog.route')}</dt>
                 <dd />
                 {(body?.routes ?? []).map((route: any) => (
                   <React.Fragment key={`${route.provider}/${route.model}`}>
                     <dt className="dsh-stats-route">{`${route.provider}/${route.model}`}</dt>
-                    <dd>{formatTokens(route.uncachedInputTokens + route.cacheReadTokens + route.cacheWriteTokens + route.outputTokens)}</dd>
+                    <dd>{`${formatTokens(route.uncachedInputTokens + route.cacheReadTokens + route.cacheWriteTokens + route.outputTokens)}${body.priced === true ? ` · ${formatMoney(route.amount, body.currency)}` : ''}`}</dd>
+                  </React.Fragment>
+                ))}
+                {(body?.unpriced ?? []).map((route: any) => (
+                  <React.Fragment key={`unpriced/${route.provider}/${route.model}`}>
+                    <dt className="dsh-stats-route">{`${route.provider}/${route.model}`}</dt>
+                    <dd>{`${formatTokens(route.tokens)} · ${t('dialog.unpriced')}`}</dd>
                   </React.Fragment>
                 ))}
                 <dt>{t('dialog.input')}</dt>
@@ -322,6 +349,14 @@ function StatsPill(props: StatsPillProps): unknown {
                 <dd>{formatExact(totals.cacheWriteTokens ?? 0)}</dd>
                 <dt>{t('dialog.output')}</dt>
                 <dd>{formatExact(totals.outputTokens ?? 0)}</dd>
+                {body?.priced === true && (
+                  <React.Fragment>
+                    <dt>{t('dialog.peak')}</dt>
+                    <dd>{`${formatTokens(tierOf('peakTokens'))} · ${formatMoney(tierOf('peakAmount'), body.currency)}`}</dd>
+                    <dt>{t('dialog.idle')}</dt>
+                    <dd>{`${formatTokens(tierOf('idleTokens'))} · ${formatMoney(tierOf('idleAmount'), body.currency)}`}</dd>
+                  </React.Fragment>
+                )}
               </dl>
             )}
             {body !== undefined && (

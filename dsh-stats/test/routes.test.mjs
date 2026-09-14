@@ -104,22 +104,42 @@ test('answers 404 when the session cannot be read', async () => {
   assert.match((await bodyOf(response)).error, /not found/)
 })
 
-test('answers the folded summary under the configured label', async () => {
+test('answers the priced summary under the configured label', async () => {
   const { routes } = harness({ readSession: async () => snapshot(), config: { label: 'my-stats' } })
   const response = await routes.get(SUMMARY_ROUTE)
     .fetch(new Request('http://x/api/dsh-stats/summary?session=s1'))
   assert.equal(response.status, 200)
   const body = await bodyOf(response)
   assert.equal(body.label, 'my-stats')
+  assert.equal(body.currency, 'CNY')
+  assert.equal(body.priced, true)
   assert.equal(body.samples, 1)
-  assert.deepEqual(body.routes, [{
-    provider: 'deepseek',
-    model: 'deepseek-flash',
-    uncachedInputTokens: 1_000,
-    cacheReadTokens: 500,
-    cacheWriteTokens: 0,
-    outputTokens: 2_000,
-  }])
+  assert.deepEqual(body.unpriced, [])
+  // Friday 10:00 Asia/Shanghai → peak flash: 500×0.04 + 1000×2 + 2000×8 per 1M.
+  assert.ok(Math.abs(body.total - 0.01802) < 1e-9)
+  const route = body.routes[0]
+  assert.equal(route.provider, 'deepseek')
+  assert.equal(route.model, 'deepseek-flash')
+  assert.equal(route.uncachedInputTokens, 1_000)
+  assert.equal(route.cacheReadTokens, 500)
+  assert.equal(route.cacheWriteTokens, 0)
+  assert.equal(route.outputTokens, 2_000)
+  assert.equal(route.peakTokens, 3_500)
+  assert.equal(route.idleTokens, 0)
+  assert.ok(Math.abs(route.peakAmount - 0.01802) < 1e-9)
+  assert.ok(Math.abs(route.amount - 0.01802) < 1e-9)
+})
+
+test('honours a pricing override and reports unpriced models', async () => {
+  const { routes } = harness({
+    readSession: async () => snapshot(),
+    config: { pricing: { 'deepseek-flash': null, 'other/model': { cacheRead: 0, input: 3, output: 0 } } },
+  })
+  const body = await bodyOf(await routes.get(SUMMARY_ROUTE)
+    .fetch(new Request('http://x/api/dsh-stats/summary?session=s1')))
+  assert.equal(body.priced, false)
+  assert.equal(body.total, 0)
+  assert.deepEqual(body.unpriced, [{ provider: 'deepseek', model: 'deepseek-flash', tokens: 3_500 }])
 })
 
 test('memoizes a fold until a usage sample lands', async () => {

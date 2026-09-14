@@ -56,6 +56,20 @@ test('skips assistant messages without usable usage', () => {
   assert.deepEqual(fold.rows, [])
 })
 
+test('classifies samples into peak and idle tiers by local time', () => {
+  // TIME is Friday 10:00 Asia/Shanghai (peak); the variants move out of the windows.
+  const events = [
+    message(1, { provider: 'deepseek', model: 'flash' }, { inputTokens: 100 }),
+    { ...message(2, { provider: 'deepseek', model: 'flash' }, { inputTokens: 50 }), time: Date.UTC(2026, 8, 11, 12, 0, 0) },
+    { ...message(3, { provider: 'deepseek', model: 'flash' }, { inputTokens: 25 }), time: Date.UTC(2026, 8, 12, 2, 0, 0) },
+  ]
+  const fold = summarizeUsage(events, { timeZone: 'Asia/Shanghai' })
+  assert.equal(fold.samples, 3)
+  assert.equal(fold.rows.length, 2)
+  const tiers = Object.fromEntries(fold.rows.map(row => [row.tier, row.uncachedInputTokens]))
+  assert.deepEqual(tiers, { peak: 100, idle: 75 })
+})
+
 test('tolerates non-array event logs', () => {
   assert.deepEqual(summarizeUsage(undefined).rows, [])
   assert.deepEqual(summarizeUsage(null).totals, {

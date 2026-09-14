@@ -67,6 +67,9 @@ const zh = {
     'dialog.cacheRead': '缓存命中',
     'dialog.cacheWrite': '缓存写入',
     'dialog.output': '输出',
+    'dialog.peak': '高峰',
+    'dialog.idle': '空闲',
+    'dialog.unpriced': '未配置价格',
     'dialog.samples': '{samples} 个计费样本 · 跳过 {skipped} 个',
     'dialog.empty': '本次会话还没有用量记录',
     'dialog.error': '读取失败：{message}',
@@ -80,6 +83,9 @@ const en = {
     'dialog.cacheRead': 'Cache hit',
     'dialog.cacheWrite': 'Cache write',
     'dialog.output': 'Output',
+    'dialog.peak': 'Peak',
+    'dialog.idle': 'Idle',
+    'dialog.unpriced': 'No configured price',
     'dialog.samples': '{samples} billed samples · {skipped} skipped',
     'dialog.empty': 'This session has no usage yet',
     'dialog.error': 'Read failed: {message}',
@@ -208,6 +214,15 @@ function formatExact(value) {
     return value.toLocaleString('en-US');
 }
 /**
+ * Money text: two decimals at or above one cent, four below, currency-symbol
+ * first when the currency is known.
+ */
+function formatMoney(amount, currency) {
+    const symbol = currency === 'CNY' ? '¥' : currency === 'USD' ? '$' : `${currency} `;
+    const abs = Math.abs(amount);
+    return `${symbol}${amount.toFixed(abs !== 0 && abs < 0.01 ? 4 : 2)}`;
+}
+/**
  * Read one JSON endpoint, debounced, keeping the last good body across
  * refreshes and exposing a manual retry.
  */
@@ -277,31 +292,37 @@ function StatsPill(props) {
         return null;
     const body = stats.body;
     const totals = body?.totals ?? {};
+    const tierOf = (key) => (body?.routes ?? []).reduce((total, route) => total + (route[key] ?? 0), 0);
     const grand = (body?.routes ?? []).reduce((sum, route) => sum + route.uncachedInputTokens + route.cacheReadTokens
         + route.cacheWriteTokens + route.outputTokens, 0);
-    const amountText = body !== undefined ? formatTokens(grand) : '…';
+    const tokensText = body !== undefined ? formatTokens(grand) : '…';
+    const moneyText = body?.priced === true ? formatMoney(body.total, body.currency) : undefined;
+    const pillText = moneyText !== undefined ? `${tokensText} · ${moneyText}` : tokensText;
     return (React.createElement("div", { className: "dsh-stats-root", "data-dsh-stats": true },
         React.createElement("span", { ref: rootRef, className: "dsh-stats-anchor" },
-            React.createElement("button", { type: "button", className: "dsh-stats-pill", "aria-haspopup": "dialog", "aria-expanded": open, "aria-label": t('pill.aria', { tokens: amountText }), onClick: () => { setOpen(!open); } },
+            React.createElement("button", { type: "button", className: "dsh-stats-pill", "aria-haspopup": "dialog", "aria-expanded": open, "aria-label": t('pill.aria', { tokens: tokensText }), onClick: () => { setOpen(!open); } },
                 React.createElement(StatsIcon, null),
-                React.createElement("span", null, amountText)),
+                React.createElement("span", null, pillText)),
             open && (0, react_dom_1.createPortal)(React.createElement("div", { ref: panelRef, className: "dsh-stats-panel", role: "dialog", "aria-label": t('dialog.title'), style: pos ?? MEASURE_STYLE },
                 React.createElement("div", { className: "dsh-stats-title" },
                     React.createElement("span", { className: "dsh-stats-titleLabel" },
                         React.createElement(StatsIcon, null),
                         t('dialog.title')),
-                    React.createElement("span", { className: "dsh-stats-titleValue" }, stats.status === 'error' ? '—' : amountText)),
+                    React.createElement("span", { className: "dsh-stats-titleValue" }, stats.status === 'error' ? '—' : pillText)),
                 React.createElement("div", { className: "dsh-stats-rule", "aria-hidden": true }),
                 stats.status === 'error' && (React.createElement("div", { className: "dsh-stats-note" },
                     t('dialog.error', { message: stats.error ?? '' }),
                     React.createElement("button", { type: "button", className: "dsh-stats-retry", onClick: stats.reload }, t('dialog.retry')))),
                 stats.status !== 'error' && grand === 0 && (React.createElement("div", { className: "dsh-stats-note" }, t('dialog.empty'))),
-                stats.status !== 'error' && grand > 0 && (React.createElement("dl", { className: "dsh-stats-details" },
+                stats.status !== 'error' && (grand > 0 || (body?.unpriced ?? []).length > 0) && (React.createElement("dl", { className: "dsh-stats-details" },
                     React.createElement("dt", null, t('dialog.route')),
                     React.createElement("dd", null),
                     (body?.routes ?? []).map((route) => (React.createElement(React.Fragment, { key: `${route.provider}/${route.model}` },
                         React.createElement("dt", { className: "dsh-stats-route" }, `${route.provider}/${route.model}`),
-                        React.createElement("dd", null, formatTokens(route.uncachedInputTokens + route.cacheReadTokens + route.cacheWriteTokens + route.outputTokens))))),
+                        React.createElement("dd", null, `${formatTokens(route.uncachedInputTokens + route.cacheReadTokens + route.cacheWriteTokens + route.outputTokens)}${body.priced === true ? ` · ${formatMoney(route.amount, body.currency)}` : ''}`)))),
+                    (body?.unpriced ?? []).map((route) => (React.createElement(React.Fragment, { key: `unpriced/${route.provider}/${route.model}` },
+                        React.createElement("dt", { className: "dsh-stats-route" }, `${route.provider}/${route.model}`),
+                        React.createElement("dd", null, `${formatTokens(route.tokens)} · ${t('dialog.unpriced')}`)))),
                     React.createElement("dt", null, t('dialog.input')),
                     React.createElement("dd", null, formatExact(totals.uncachedInputTokens ?? 0)),
                     React.createElement("dt", null, t('dialog.cacheRead')),
@@ -309,7 +330,12 @@ function StatsPill(props) {
                     React.createElement("dt", null, t('dialog.cacheWrite')),
                     React.createElement("dd", null, formatExact(totals.cacheWriteTokens ?? 0)),
                     React.createElement("dt", null, t('dialog.output')),
-                    React.createElement("dd", null, formatExact(totals.outputTokens ?? 0)))),
+                    React.createElement("dd", null, formatExact(totals.outputTokens ?? 0)),
+                    body?.priced === true && (React.createElement(React.Fragment, null,
+                        React.createElement("dt", null, t('dialog.peak')),
+                        React.createElement("dd", null, `${formatTokens(tierOf('peakTokens'))} · ${formatMoney(tierOf('peakAmount'), body.currency)}`),
+                        React.createElement("dt", null, t('dialog.idle')),
+                        React.createElement("dd", null, `${formatTokens(tierOf('idleTokens'))} · ${formatMoney(tierOf('idleAmount'), body.currency)}`))))),
                 body !== undefined && (React.createElement("div", { className: "dsh-stats-note" }, t('dialog.samples', { samples: body.samples ?? 0, skipped: body.skipped ?? 0 })))), document.body))));
 }
 exports.name = NS;

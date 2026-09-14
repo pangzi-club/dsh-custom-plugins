@@ -1,15 +1,19 @@
-import { summarizeUsage } from './host/fold.js'
+import { summarizeUsage, DEFAULT_TIME_ZONE } from './host/fold.js'
+import { DEFAULT_CURRENCY, normalizePricing, priceRows } from './host/pricing.js'
 
 /**
- * dsh-stats - session usage statistics fro the Web GUI (Host half, v1).
- * 
- * v1 claims one exact route: GET /dsh-stats/ping answers a JSON heartbeat, to
- * confirm the plugin is mounted and its route is alive.
+ * dsh-stats - session usage statistics for the Web GUI (Host half).
+ *
+ * Claims GET /dsh-stats/ping (heartbeat) and the authenticated
+ * GET /api/dsh-stats/summary?session=<id>, which folds the session's durable
+ * log into per-route, per-tier token rows and prices them with the effective
+ * table (built-in DeepSeek peak/idle CNY rates, overridable from this row's
+ * `pricing` config). Also registers the `session_stats` tool.
  */
 
 const PING_PATH = '/dsh-stats/ping'
 
-const DEFAULT_CONFIG = { label: 'dsh-stats', timestamp: true }
+const DEFAULT_CONFIG = { label: 'dsh-stats', timestamp: true, timeZone: DEFAULT_TIME_ZONE }
 
 /**
  * Validate the plugin-row config and merge it over the defaults. Invalid
@@ -23,15 +27,28 @@ function resolveConfig(config) {
     throw new Error(`dsh-stats: config must be a mapping, got ${JSON.stringify(source)}`)
   }
   if (source.label !== undefined
-    && (typeof source.label !== 'string' || source.label.trim().length === 0)) {
+      && (typeof source.label !== 'string' || source.label.trim().length === 0)) {
     throw new Error(`dsh-stats: config.label must be a non-empty string, got ${JSON.stringify(source.label)}`)
   }
   if (source.timestamp !== undefined && typeof source.timestamp !== 'boolean') {
     throw new Error(`dsh-stats: config.timestamp must be a boolean, got ${JSON.stringify(source.timestamp)}`)
   }
+  const timeZone = typeof source.timeZone === 'string' && source.timeZone.trim().length > 0
+    ? source.timeZone.trim()
+    : DEFAULT_CONFIG.timeZone
+  if (source.timeZone !== undefined && typeof source.timeZone !== 'string') {
+    throw new Error(`dsh-stats: config.timeZone must be a string, got ${JSON.stringify(source.timeZone)}`)
+  }
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone })
+  } catch {
+    throw new Error(`dsh-stats: config.timeZone is not a valid IANA time zone: ${JSON.stringify(source.timeZone)}`)
+  }
   return {
     label: typeof source.label === 'string' ? source.label.trim() : DEFAULT_CONFIG.label,
     timestamp: typeof source.timestamp === 'boolean' ? source.timestamp : DEFAULT_CONFIG.timestamp,
+    timeZone,
+    pricing: normalizePricing(source.pricing),
   }
 }
 
@@ -90,6 +107,31 @@ export function apply(ctx, config = {}) {
     if (entry !== undefined) entry.dirty = true
   })
 
+  /** Read one session and fold + price it; `notFound` marks an unreadable session. */
+  const readSummary = async (sessionId) => {
+    let snapshot
+    try {
+      snapshot = await ctx.sessionQuery.readSession(sessionId)
+    } catch (error) {
+      return { notFound: `dsh-stats: ${messageOf(error)}` }
+    }
+    const fold = summarizeUsage(snapshot.events, { timeZone: effective.timeZone })
+    const priced = priceRows(fold.rows, effective.pricing)
+    return {
+      body: {
+        sessionId,
+        label: effective.label,
+        currency: DEFAULT_CURRENCY,
+        total: priced.total,
+        priced: priced.routes.length > 0,
+        routes: priced.routes,
+        unpriced: priced.unpriced,
+        samples: fold.samples,
+        skipped: fold.skipped,
+      },
+    }
+  }
+
   const serveSummary = async (request) => {
     const requested = new URL(request.url).searchParams.get('session')?.trim() ?? ''
     if (requested.length === 0) {
@@ -97,24 +139,11 @@ export function apply(ctx, config = {}) {
     }
     const cached = memo.get(requested)
     if (cached !== undefined && cached.dirty !== true) return json(cached.body)
-    let snapshot
-    try {
-      snapshot = await ctx.sessionQuery.readSession(requested)
-    } catch (error) {
-      return json({ error: `dsh-stats: ${messageOf(error)}` }, 404)
-    }
-    const fold = summarizeUsage(snapshot.events)
-    const body = {
-      sessionId: requested,
-      label: effective.label,
-      routes: fold.rows,
-      totals: fold.totals,
-      samples: fold.samples,
-      skipped: fold.skipped,
-    }
+    const outcome = await readSummary(requested)
+    if (outcome.notFound !== undefined) return json({ error: outcome.notFound }, 404)
     if (memo.size >= MEMO_LIMIT) memo.delete(memo.keys().next().value)
-    memo.set(requested, { body, dirty: false })
-    return json(body)
+    memo.set(requested, { body: outcome.body, dirty: false })
+    return json(outcome.body)
   }
 
   ctx.effect(
@@ -149,20 +178,11 @@ export function apply(ctx, config = {}) {
         if (typeof session !== 'string' || session.trim().length === 0) {
           throw new Error('session_stats: arguments.session must be a non-empty string')
         }
-        let snapshot
-        try {
-          snapshot = await ctx.sessionQuery.readSession(session.trim())
-        } catch (error) {
-          throw new Error(`session_stats: cannot read session: ${messageOf(error)}`)
+        const outcome = await readSummary(session.trim())
+        if (outcome.notFound !== undefined) {
+          throw new Error(`session_stats: cannot read session: ${outcome.notFound}`)
         }
-        const fold = summarizeUsage(snapshot.events)
-        return {
-          session: session.trim(),
-          routes: fold.rows,
-          totals: fold.totals,
-          samples: fold.samples,
-          skipped: fold.skipped,
-        }
+        return outcome.body
       },
     }),
     'dsh-stats: tool session_stats',
