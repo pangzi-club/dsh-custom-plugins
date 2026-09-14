@@ -1,4 +1,5 @@
 node_modules/
+.zcode/
 
 # Machine-local pointer to the deepseek-harness checkout used by dsh-cost/build.mjs.
 .dsh-repo
