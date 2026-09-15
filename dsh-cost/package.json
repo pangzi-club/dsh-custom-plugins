@@ -24,5 +24,8 @@
     "test": "node --test test/*.test.mjs"
   },
   "license": "MIT",
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
 }

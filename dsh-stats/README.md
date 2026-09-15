@@ -74,9 +74,9 @@ pnpm dsh plugin --profile web add dsh-session-stats
 ```
 
 方式 C：git 子目录安装（本仓库根是插件集合、不是单包，需用 pnpm 的 `#path:` 写法指向
-插件目录）。注意 `lib/` 不入库：git 渠道装到的包没有构建产物，而构建又依赖本机的上游
-checkout（`.dsh-repo`/`DSH_REPO`），因此 git 渠道只适合本仓库协作者；对外分发用方式 B
-（npm 包在发布前已 `node build.mjs`，产物随 tarball 走）：
+插件目录）。注意 `lib/` 不入库：git 渠道装到的包没有构建产物，装完需在插件目录内
+`pnpm install`（取 typescript devDependency）并 `node build.mjs`，因此 git 渠道只适合
+本仓库协作者；对外分发用方式 B（npm 包在发布前已 `node build.mjs`，产物随 tarball 走）：
 
 ```sh
 pnpm dsh plugin --profile web add 'github:pangzi-club/dsh-custom-plugins#path:dsh-stats'
@@ -94,8 +94,8 @@ npm test    # node --test，24 项，零依赖、不打网络
 修改 `src/` 下任意源码后先 `node build.mjs` 再跑测试：两个半边的产物统一重建到 `lib/`
 （宿主 `lib/index.js` + `lib/host/`、客户端 `lib/client.js`），测试执行的是产物
 （bundle 测试会执行 `lib/client.js`）。`lib/` 在 `.gitignore` 里，改源码不产生 git 噪音；
-换机器或新 clone 后需要先配置 `.dsh-repo`（或 `DSH_REPO`）并跑一次 `node build.mjs`，
-插件才有产物可加载。
+换机器或新 clone 后需要先 `pnpm install`（装入 typescript devDependency，本目录
+`node_modules/.bin/tsc`）并跑一次 `node build.mjs`，插件才有产物可加载。
 
 ## 已知限制
 

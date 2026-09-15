@@ -38,7 +38,7 @@ dsh-<feature>/
 ├── host/                 # 可选：Host 侧纯函数，便于脱离 ctx 单测
 ├── src/client/index.tsx  # 可选：Web Client 半边源码（单文件）
 ├── lib/client.js         # 可选：客户端构建产物，提交进仓库；host 半边也 TS 化的插件把全部产物统一放 lib/（入口 lib/index.js，见 dsh-stats——其 lib/ 不入库，本机构建）
-├── build.mjs             # 可选：用上游 tsc 构建 lib/client.js
+├── build.mjs             # 可选：用插件自带的 tsc（devDependency）构建 lib/client.js
 ├── cordis.patch.yml      # 可选：bundle 层，供 dsh plugin add 安装
 ├── test/*.test.mjs       # node --test
 └── README.md             # 作用 / 原理 / 配置 / 启用 / 测试 / 已知限制
@@ -65,8 +65,8 @@ dsh-<feature>/
 - `dsh.client`（`platform: "web"`）声明客户端半边；`exports["./client"]` 指向构建产物。
   两者同时存在时，客户端 bundle 才会进 `/plugins` 的模块表。
 - `dsh.bundle.patch` 声明 bundle 层，`dsh plugin add` 才会插入插件行。
-- **不引入第三方依赖**：本工作区没有 `node_modules`、没有 lockfile；Host 代码与测试只用
-  Node 内置模块。
+- **运行时零依赖**：Host 代码与测试只用 Node 内置模块，客户端只用基线模块；`node_modules`
+  只允许出现构建工具（如 `typescript` devDependency，pnpm 安装、lockfile 入库），不许进运行时。
 
 ## 4. 插件契约（Cordis）
 
@@ -116,7 +116,7 @@ export function apply(ctx, config = {}) {
 
 - 能用 exact 路由 / 增量插槽 / 事件监听解决的，就不要碰核心。
 - 「扩展点不够就绕过」不是选项；见 §1。
-- Host 半边**不能** `import '@deepseek-ai/dsh-*'`（本工作区没有 node_modules，Node 解析不到）。
+- Host 半边**不能** `import '@deepseek-ai/dsh-*'`（本工作区没有这类依赖，Node 解析不到）。
   客户端半边的裸包名由浏览器模块表解析，因此只能用基线模块（React、react-dom、
   `@deepseek-ai/dsh-client-ui-primitives`）。
 
@@ -150,11 +150,12 @@ export function apply(ctx, config = {}) {
 
 - `src/client/index.tsx` 必须**单文件、无相对 import**：只有 `lib/client.js` 一个资源会被
   `/plugins` 服务，`require` 由浏览器模块表回答。
-- 构建用上游 checkout 的 `tsc`，把编译结果包进 `window.__ModuleLoader__.load({ id, factory })`
+- 构建用插件自己的 `tsc`（`typescript` 作为 devDependency，pnpm 安装、版本精确锁定，
+  目前 6.0.3 与上游一致），把编译结果包进 `window.__ModuleLoader__.load({ id, factory })`
   信封：照抄 `dsh-cost/build.mjs` 与 `dsh-cost/tsconfig.build.json`。
-- checkout 路径是**机器本地配置**：从环境变量 `DSH_REPO` 或 git-ignored 的
-  `dsh-cost/.dsh-repo` 解析；代码、文档、注释里都不要写个人绝对路径，缺失时要给出可操作的
-  报错（而不是晦涩的 `undefined` 崩溃）。
+- 新插件若要 TS 构建：`pnpm add -D -E typescript`，build.mjs 从本目录
+  `node_modules/.bin/tsc` 取编译器，缺失时报可操作的错（提示先 `pnpm install`）；
+  不要再依赖上游 checkout 的工具链。
 - `lib/client.js` **提交进仓库**，这样用户不需要构建即可使用；只在改了 `src/client/` 后才
   需要重新 `node build.mjs`。
 - 定位/关闭等交互优先复用 `@deepseek-ai/dsh-client-ui-primitives` 的 hook

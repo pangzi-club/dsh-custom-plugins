@@ -40,15 +40,14 @@ dsh-custom/
     ├── src/index.ts             # Host 入口（TypeScript）
     ├── src/host/                # Host 侧纯函数与最小 ctx 类型声明（TypeScript）
     ├── lib/                     # 构建产物（.gitignore 忽略，node build.mjs 本地生成）
-    ├── build.mjs                # 用上游 checkout 的 tsc 重建两个半边到 lib/
+    ├── build.mjs                # 用插件自带的 tsc（devDependency）重建两个半边到 lib/
     └── test/*.test.mjs
 ```
 
 ## 环境前提
 
-- 一个可运行的 DSH 源码 checkout（本文用 `/path/to/deepseek-harness` 指代）。
-  `dsh-cost/build.mjs` 用该 checkout 的 `tsc`，路径从环境变量 `DSH_REPO` 或 git-ignored 的
-  `dsh-cost/.dsh-repo` 解析。
+- 一个可运行的 DSH 源码 checkout（本文用 `/path/to/deepseek-harness` 指代），用于启动 GUI、
+  查扩展点文档；构建插件本身不再依赖它（`typescript` 是各构建型插件的 devDependency）。
 - Node `^22.19 || >=24`；在上游 checkout 里执行 `pnpm install`。
 - `$DSH_HOME`（默认 `~/.dsh`）下存在 `web` profile；profile 的 `package.json` 声明
   `patchReload: live`，并在 `cordis.patch.yml` 里挂上插件。
@@ -130,13 +129,12 @@ cd dsh-stats && npm test               # node --test，24 项
 ```
 
 修改 `dsh-cost/src/client/index.tsx` 后需要重建客户端 bundle（`lib/client.js` 已提交，
-仅改 Host 半边时不必重建）：
+仅改 Host 半边时不必重建）。构建用插件自己的 `typescript` devDependency，先装一次依赖：
 
 ```sh
 cd dsh-cost
-echo /path/to/deepseek-harness > .dsh-repo          # 一次性：写入本地 checkout 路径（git-ignored）
-node build.mjs                                      # 用 DSH_REPO / .dsh-repo 解析 checkout
-DSH_REPO=/path/to/deepseek-harness node build.mjs   # 也可以按次覆盖
+pnpm install     # 一次性：按 pnpm-lock.yaml 装入 node_modules/.bin/tsc
+node build.mjs   # tsc 缺失时会报错提示先 pnpm install
 ```
 
 客户端 bundle 只有 `lib/client.js` 一个资源会被 `/plugins` 服务，因此

@@ -61,9 +61,16 @@ React、`react-dom`、`@deepseek-ai/dsh-client-ui-primitives`（定位/关闭等
     "build": "node build.mjs",
     "test": "node --test test/*.test.mjs"
   },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  },
   "private": true
 }
 ```
+
+`typescript` 是唯一的依赖，而且只是**构建工具**（版本精确锁定，与上游 DSH 用的 tsc 一致）；
+运行时代码仍然零依赖。用 `pnpm add -D -E typescript` 安装，lockfile 提交进仓库，
+换机器 `pnpm install` 即可复现。
 
 ## 3. 客户端组件：`src/client/index.tsx`
 
@@ -555,7 +562,7 @@ declare namespace JSX {
 组件以后用到新的基线 API（比如 `React.useReducer`）时，记得回来给对应的 `declare module`
 补一条声明——垫片只覆盖「用到的面」。
 
-**`dsh-stats/build.mjs`**——解析上游 checkout、跑 `tsc`、把产物包进信封：
+**`dsh-stats/build.mjs`**——用插件自带的 `tsc` 编译、把产物包进信封：
 
 ```js
 /**
@@ -568,9 +575,8 @@ declare namespace JSX {
  * `window.__ModuleLoader__.load({ id, factory })` handoff. Bare specifiers stay
  * `require(...)` calls, answered by the loader's module table.
  *
- * Usage: node build.mjs
- *   The DSH checkout that owns `tsc` is machine-local: set DSH_REPO, or write
- *   the path into the git-ignored `.dsh-repo` file next to this script.
+ * Usage: pnpm install (once, brings in the typescript devDependency), then
+ *   node build.mjs
  */
 
 import { execFileSync } from 'node:child_process'
@@ -581,31 +587,11 @@ import { fileURLToPath } from 'node:url'
 const root = dirname(fileURLToPath(import.meta.url))
 const packageName = 'dsh-stats'
 
-/**
- * Resolve the checkout that provides `tsc`: env first, then the local pointer
- * file, then an actionable failure.
- * @returns the configured checkout path.
- */
-function resolveRepo() {
-  const configured = process.env.DSH_REPO?.trim()
-  if (configured) return configured
-  const pointer = join(root, '.dsh-repo')
-  if (existsSync(pointer)) {
-    const fromFile = readFileSync(pointer, 'utf8').trim()
-    if (fromFile) return fromFile
-  }
-  throw new Error(
-    'build.mjs: no deepseek-harness checkout configured.\n'
-      + `Set DSH_REPO=/path/to/deepseek-harness, or write that path into ${pointer} (git-ignored).`,
-  )
-}
-
-const repo = resolveRepo()
-const tsc = join(repo, 'node_modules', '.bin', 'tsc')
+const tsc = join(root, 'node_modules', '.bin', 'tsc')
 if (!existsSync(tsc)) {
   throw new Error(
     `build.mjs: ${tsc} not found.\n`
-      + 'Point DSH_REPO at a deepseek-harness checkout whose dependencies are installed (pnpm install).',
+      + 'Install dependencies first: pnpm install.',
   )
 }
 
@@ -626,14 +612,14 @@ console.log(`built lib/client.js (${(banner + moduleSource + footer).length} byt
 
 ```sh
 cd dsh-stats
-echo /path/to/deepseek-harness > .dsh-repo    # 一次性写入（git-ignored）
-node build.mjs                                # 或 DSH_REPO=/path/to/deepseek-harness node build.mjs
+pnpm install     # 一次性：按 lockfile 装入 node_modules/.bin/tsc
+node build.mjs
 ```
 
-配套的 `.gitignore` 条目（`.dsh-repo` 是机器本地指针，`.build/` 是瞬态产物）：
+配套的 `.gitignore` 条目（`node_modules/` 是本地安装的依赖，`.build/` 是瞬态产物）：
 
 ```
-.dsh-repo
+node_modules/
 .build/
 ```
 

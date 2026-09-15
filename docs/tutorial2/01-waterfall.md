@@ -91,7 +91,7 @@ end     { attemptId, outcome: committed | abandoned }  结算（或放弃）
 
 ## 3. 动手：脚手架 + 观察者
 
-本章建出插件的完整骨架。构建链（`build.mjs`、tsconfig、`.dsh-repo` 指针）照抄第一辑
+本章建出插件的完整骨架。构建链（`build.mjs`、tsconfig、typescript devDependency）照抄第一辑
 [第 5 章](../tutorial/05-web-client.md)的做法，下面只列**本插件的**文件全文与差异。
 
 ### 3.1 包与构建链
@@ -113,13 +113,16 @@ end     { attemptId, outcome: committed | abandoned }  结算（或放弃）
     "build": "node build.mjs",
     "test": "node --test test/*.test.mjs"
   },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  },
   "private": true
 }
 ```
 
 **`dsh-tool-watchtower/build.mjs`**：v1 只编译宿主半边（客户端半边第 5 章加入时再换成
-双半边版本）。开头 `resolveRepo()` 原样照抄第一辑第 5 章 `build.mjs` 的同名函数（环境
-变量 `DSH_REPO` 优先、`.dsh-repo` 指针兜底、缺失时给出可操作的报错）：
+双半边版本）。`tsc` 来自插件自己的 devDependency（先 `pnpm add -D -E typescript`，
+lockfile 入库），缺失时给出可操作的报错：
 
 ```js
 /**
@@ -127,9 +130,8 @@ end     { attemptId, outcome: committed | abandoned }  结算（或放弃）
  * the live panel later). Output stages through .build/ so a failed compile
  * never leaves a half-updated lib/ behind.
  *
- * Usage: node build.mjs
- *   The DSH checkout that owns `tsc` is machine-local: set DSH_REPO, or write
- *   the path into the git-ignored `.dsh-repo` file next to this script.
+ * Usage: pnpm install (once, brings in the typescript devDependency), then
+ *   node build.mjs
  */
 
 import { execFileSync } from 'node:child_process'
@@ -139,26 +141,11 @@ import { fileURLToPath } from 'node:url'
 
 const root = dirname(fileURLToPath(import.meta.url))
 
-/** Resolve the checkout that provides `tsc`; env first, then the pointer file. */
-function resolveRepo() {
-  const configured = process.env.DSH_REPO?.trim()
-  if (configured) return configured
-  const pointer = join(root, '.dsh-repo')
-  if (existsSync(pointer)) {
-    const fromFile = readFileSync(pointer, 'utf8').trim()
-    if (fromFile) return fromFile
-  }
-  throw new Error(
-    'build.mjs: no deepseek-harness checkout configured.\n'
-      + `Set DSH_REPO=/path/to/deepseek-harness, or write that path into ${pointer} (git-ignored).`,
-  )
-}
-
-const tsc = join(resolveRepo(), 'node_modules', '.bin', 'tsc')
+const tsc = join(root, 'node_modules', '.bin', 'tsc')
 if (!existsSync(tsc)) {
   throw new Error(
     `build.mjs: ${tsc} not found.\n`
-      + 'Point DSH_REPO at a deepseek-harness checkout whose dependencies are installed (pnpm install).',
+      + 'Install dependencies first: pnpm install.',
   )
 }
 
@@ -173,8 +160,8 @@ console.log('built lib/index.js + lib/host/')
 ```
 
 `tsconfig.host.build.json`、`tsconfig.json`（编辑器入口）与 `.gitignore` 从 `dsh-stats/`
-原样抄过来，不用改（`include` 恰好都是 `src/index.ts` + `src/host`）。另外把上游 checkout
-路径写进 git-ignored 的 `dsh-tool-watchtower/.dsh-repo`（一行绝对路径）。
+原样抄过来，不用改（`include` 恰好都是 `src/index.ts` + `src/host`）。然后在本目录跑一次
+`pnpm install`，把 lockfile 里的 `typescript` 装进 `node_modules/.bin/`。
 
 ### 3.2 类型垫片：`src/host/context.d.ts`
 

@@ -36,5 +36,8 @@
     "url": "git+ssh://git@github.com/pangzi-club/dsh-custom-plugins.git",
     "directory": "dsh-stats"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
 }

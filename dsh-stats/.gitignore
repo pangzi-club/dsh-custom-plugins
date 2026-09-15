@@ -1,8 +1,5 @@
 node_modules/
 
-# build.mjs 的机器本地指针：上游 DSH checkout 路径
-.dsh-repo
-
 # build.mjs 的瞬态 tsc 产物（构建成功后本来就会被清掉）
 .build/
 lib/

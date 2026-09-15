@@ -47,11 +47,12 @@ pill ──GET /api/dsh-cost/session?session=<id>──▶ 读日志 → 逐样�
 
 ```sh
 cd dsh-cost
+pnpm install             # 一次性：装入 typescript devDependency（node_modules/.bin/tsc）
 npm test                 # node --test test/*.test.mjs（40 项）
-node build.mjs           # 用仓库的 tsc 编译 src/client/index.tsx 并包成 lib/client.js
+node build.mjs           # 用插件自带的 tsc 编译 src/client/index.tsx 并包成 lib/client.js
 ```
 
-`build.mjs` 用 DSH checkout 里的 `tsc`；checkout 路径是机器本地配置，代码里不写死。解析顺序：环境变量 `DSH_REPO` → 本目录下 git-ignored 的 `.dsh-repo` 文件（首次使用写一次：`echo /path/to/deepseek-harness > .dsh-repo`）→ 带着提示信息报错。客户端 bundle 只有 `lib/client.js` 一个资源会被 `/plugins` 服务，因此 `src/client/index.tsx` 必须保持单文件、无相对 import。
+`build.mjs` 用本目录 `node_modules/.bin/tsc`（`typescript` 是 devDependency，版本精确锁定，与上游 checkout 一致），不再依赖 DSH checkout；tsc 缺失时会报错提示先 `pnpm install`。客户端 bundle 只有 `lib/client.js` 一个资源会被 `/plugins` 服务，因此 `src/client/index.tsx` 必须保持单文件、无相对 import。
 
 ## 生效与运维
 
