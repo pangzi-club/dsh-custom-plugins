@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.host.build.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "react"
+  },
+  "include": ["src"]
+}

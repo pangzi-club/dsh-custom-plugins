@@ -1,0 +1,17 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM"],
+    "module": "CommonJS",
+    "moduleResolution": "Node",
+    "ignoreDeprecations": "6.0",
+    "jsx": "react",
+    "strict": false,
+    "skipLibCheck": true,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": ".build",
+    "types": ["Node"]
+  },
+  "include": ["src/client/index.tsx"]
+}
