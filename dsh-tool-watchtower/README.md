@@ -98,8 +98,30 @@ pnpm install     # 一次性：装入 typescript devDependency（node_modules/.b
 node build.mjs   # 两个半边的产物统一重建到 lib/
 ```
 
-方式 B（bundle）：本插件未声明 `dsh.bundle`；要分发请按 `AGENTS.md` 补
-`cordis.patch.yml` 后 `pnpm dsh plugin --profile web add <插件目录>`。
+方式 B（npm 包，已发布）：本插件声明了 `dsh.bundle`，按包名安装即插入插件行：
+
+```sh
+pnpm dsh plugin --profile web add dsh-tool-watchtower
+```
+
+方式 C（git 子目录安装）：本仓库根是插件集合、不是单包，需用 pnpm 的 `#path:` 写法
+指向插件目录。注意 `lib/` 不入库：git 渠道装到的包没有构建产物，装完需在插件目录内
+`pnpm install` 并 `node build.mjs`，因此只适合本仓库协作者；对外分发用方式 B（npm
+包在发布前已重新构建，产物随 tarball 走）：
+
+```sh
+pnpm dsh plugin --profile web add 'github:pangzi-club/dsh-custom-plugins#path:dsh-tool-watchtower'
+```
+
+三种方式安装或变更后都需要重启 `dsh web` 并刷新页面。关闭：方式 A 删除插件行；方式
+B/C 执行 `pnpm dsh plugin --profile web remove dsh-tool-watchtower`。
+
+## 发布
+
+`npm publish`（在 npm 上 `dsh-tool-watchtower` 名字可用，包名与插件名、客户端模块 id
+一致，无需改名）。`prepublishOnly` 会先 `node build.mjs && npm test`（42 项全绿才允许
+上传）；发布内容由 `files` 白名单约束（`lib/` 两个半边 + `cordis.patch.yml`），`src/`
+与 `test/` 不进包。首次发布前跑一次 `pnpm install` 装入构建工具。
 
 ## 验证
 

@@ -12,15 +12,33 @@
   "dsh": {
     "client": {
       "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
     }
   },
+  "files": [
+    "lib",
+    "cordis.patch.yml"
+  ],
   "scripts": {
     "build": "node build.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "prepublishOnly": "node build.mjs && npm test"
   },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "dsh-plugin"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/pangzi-club/dsh-custom-plugins.git",
+    "directory": "dsh-tool-watchtower"
+  },
+  "license": "MIT",
   "devDependencies": {
     "@types/node": "^26.5.1",
     "typescript": "6.0.3"
-  },
-  "private": true
+  }
 }

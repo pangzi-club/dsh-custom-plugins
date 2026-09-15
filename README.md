@@ -112,6 +112,12 @@ pnpm dsh --profile web --dump-config     # 可见 "# == dsh-favicon-triangle" �
 
 `dsh-cost` 目前只声明了 `dsh.client`（客户端半边），没有 `dsh.bundle`，因此用方式 A
 按绝对路径加载；若要长期分发它，需要补一个 `cordis.patch.yml` bundle 层（见 `AGENTS.md`）。
+已发布到 npm 的插件可直接按包名安装（发布前 `prepublishOnly` 会自动重建并跑测试）：
+
+```sh
+pnpm dsh plugin --profile web add dsh-session-stats
+pnpm dsh plugin --profile web add dsh-tool-watchtower
+```
 
 ### 3. 验证
 

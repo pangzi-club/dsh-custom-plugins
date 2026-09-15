@@ -1,0 +1,4 @@
+# npm pack 会把 .gitignore 当作排除依据；本目录的 lib/ 在 .gitignore 里
+# （构建产物不入库），但它们恰恰是必须随包发布的运行时文件。此文件存在时
+# npm 完全改用它、不再看 .gitignore；发布内容另由 package.json 的 files
+# 白名单（lib、cordis.patch.yml）约束，src/ 与 test/ 自然不会进包。
