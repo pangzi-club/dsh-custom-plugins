@@ -11,7 +11,7 @@
     "noEmitOnError": true,
     "rootDir": "src",
     "outDir": ".build",
-    "types": ["Node"]
+    "types": []
   },
-  "include": ["src/client/index.tsx"]
+  "include": ["src/client/index.tsx", "src/shims.d.ts"]
 }

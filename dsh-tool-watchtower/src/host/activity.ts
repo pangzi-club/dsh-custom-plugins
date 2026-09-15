@@ -1,7 +1,8 @@
 /**
  * Activity fold for the watchtower: a per-session ring buffer fed by the
- * `tools/result` and `agent/assistant-stream` observers, plus the pure totals
- * fold the ping body (and, later, the live panel) serve.
+ * `tools/result`, `tools/pre-execute`, `agent/assistant-stream` and
+ * `agent/inbox/inserted` observers, plus the pure totals fold the ping body
+ * and the live panel serve.
  *
  * Pure data + pure functions: no I/O, no clock. Where an event carries no
  * timestamp of its own (start/end frames, tool outcomes), the caller hands in
@@ -27,6 +28,8 @@ export interface ToolRecord {
   isError: boolean
   /** Upstream error code when the call failed (e.g. ABORTED), when reported. */
   code?: string
+  /** Wall-clock milliseconds from the tools/execute wrapper, when measured. */
+  durationMs?: number
 }
 
 /** One model attempt, folded from its start/chunk/end frames. */
@@ -44,11 +47,38 @@ export interface ModelRecord {
   endedAt?: number
 }
 
-export type ActivityRecord = ToolRecord | ModelRecord
+/** One gate verdict the watchtower itself handed down (deny/ask only; plain allows are not audited). */
+export interface DecisionRecord {
+  kind: 'decision'
+  time: number
+  name: string
+  decision: 'deny' | 'ask'
+  reason?: string
+}
+
+/** One prompt entering the live inbox, as `agent/inbox/inserted` reported it. */
+export interface PromptRecord {
+  kind: 'prompt'
+  time: number
+  /** Characters across the message's text blocks — a size hint, NOT a token count. */
+  chars: number
+}
+
+export type ActivityRecord = ToolRecord | ModelRecord | DecisionRecord | PromptRecord
+
+/** The session's current model route, from the durable `request/header` event. */
+export interface RouteSnapshot {
+  time: number
+  provider: string
+  model: string
+}
 
 export interface ActivityTotals {
   tools: number
   toolErrors: number
+  denied: number
+  asked: number
+  prompts: number
   modelAttempts: number
   inputTokens: number
   outputTokens: number
@@ -81,6 +111,9 @@ export function foldTotals(records: readonly ActivityRecord[]): ActivityTotals {
   const totals: ActivityTotals = {
     tools: 0,
     toolErrors: 0,
+    denied: 0,
+    asked: 0,
+    prompts: 0,
     modelAttempts: 0,
     inputTokens: 0,
     outputTokens: 0,
@@ -91,6 +124,15 @@ export function foldTotals(records: readonly ActivityRecord[]): ActivityTotals {
     if (record.kind === 'tool') {
       totals.tools += 1
       if (record.isError) totals.toolErrors += 1
+      continue
+    }
+    if (record.kind === 'decision') {
+      if (record.decision === 'deny') totals.denied += 1
+      else totals.asked += 1
+      continue
+    }
+    if (record.kind === 'prompt') {
+      totals.prompts += 1
       continue
     }
     totals.modelAttempts += 1
@@ -104,18 +146,38 @@ export function foldTotals(records: readonly ActivityRecord[]): ActivityTotals {
   return totals
 }
 
+/** Total characters across an inbox message's text blocks (0 when unreadable). */
+export function promptChars(content: unknown): number {
+  if (!Array.isArray(content)) return 0
+  let total = 0
+  for (const block of content) {
+    if (typeof block === 'object' && block !== null
+      && (block as { type?: unknown }).type === 'text'
+      && typeof (block as { text?: unknown }).text === 'string') {
+      total += (block as { text: string }).text.length
+    }
+  }
+  return total
+}
+
 /**
  * One session's ring buffer. New records land at the front; the oldest drop
  * past `limit`. In-flight attempts live in `attempts` until their end frame
  * arrives, so usage and outcome land on the record pushed at start.
+ *
+ * `revision` counts every mutation a poll consumer can observe (records *and*
+ * the route slot) — the client provider compares it to decide whether a change
+ * frame is due.
  */
 export class ActivityLog {
   private readonly records: ActivityRecord[] = []
   private readonly attempts = new Map<string, ModelRecord>()
+  private revision = 0
+  private route: RouteSnapshot | undefined
 
   constructor(readonly limit: number) {}
 
-  recordTool(time: number, callId: string, name: string, isError: boolean, code?: string): void {
+  recordTool(time: number, callId: string, name: string, isError: boolean, code?: string, durationMs?: number): void {
     const record: ToolRecord = {
       kind: 'tool',
       time,
@@ -123,8 +185,24 @@ export class ActivityLog {
       name,
       isError,
       ...(code === undefined ? {} : { code }),
+      ...(durationMs === undefined ? {} : { durationMs }),
     }
     this.push(record)
+  }
+
+  recordDecision(time: number, name: string, decision: 'deny' | 'ask', reason?: string): void {
+    const record: DecisionRecord = {
+      kind: 'decision',
+      time,
+      name,
+      decision,
+      ...(reason === undefined ? {} : { reason }),
+    }
+    this.push(record)
+  }
+
+  recordPrompt(time: number, chars: number): void {
+    this.push({ kind: 'prompt', time, chars })
   }
 
   /** Fold one assistant-stream frame; `fallbackTime` covers clock-free frames. */
@@ -158,11 +236,28 @@ export class ActivityLog {
     }
   }
 
-  snapshot(): { records: readonly ActivityRecord[]; totals: ActivityTotals } {
-    return { records: [...this.records], totals: foldTotals(this.records) }
+  /**
+   * The durable route snapshot replaces — never appends — on each header. It
+   * lives outside the records (a "current value", not an event), but it is
+   * part of the snapshot, so it bumps the revision and the live panel sees
+   * route changes on the next poll.
+   */
+  setRoute(time: number, provider: string, model: string): void {
+    this.revision += 1
+    this.route = { time, provider, model }
+  }
+
+  snapshot(): {
+    revision: number
+    records: readonly ActivityRecord[]
+    totals: ActivityTotals
+    route: RouteSnapshot | undefined
+  } {
+    return { revision: this.revision, records: [...this.records], totals: foldTotals(this.records), route: this.route }
   }
 
   private push(record: ActivityRecord): void {
+    this.revision += 1
     this.records.unshift(record)
     if (this.records.length > this.limit) this.records.length = this.limit
   }

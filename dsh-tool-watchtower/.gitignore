@@ -1,0 +1,5 @@
+node_modules/
+
+# build.mjs 的瞬态 tsc 产物（构建成功后本来就会被清掉）
+.build/
+lib/

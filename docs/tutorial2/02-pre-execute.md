@@ -7,7 +7,9 @@ v1 的哨塔只看不说。v2 让它开口：给 `dsh-tool-watchtower` 加一张
 人点头。这是第一辑第 6 章「策略监听者」的完全体，也是 waterfall 纪律第一次真正上考场。
 
 > **本章状态声明**：决策类型与审批语义核对自上游 `docs/subsystems/tools.md` 与
-> `docs/subsystems/approval.md`；代码未经本工作区实测（本辑通例，下不再重复）。
+> `docs/subsystems/approval.md`；代码已按
+> [`dsh-tool-watchtower/`](../../dsh-tool-watchtower/README.md) 的实测实现核对
+> （2026-09-15，见导读「验证状态声明」）。
 
 ## 1. 瀑布上的门：位置与决策
 

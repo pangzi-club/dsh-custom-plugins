@@ -11,7 +11,8 @@ provider/model（`llm/stream`），当前会话的模型配置是什么（`sessi
 在延伸阅读里指路，正文不碰。观测位一旦越过这条线，就从「哨塔」变成「中间人」了。
 
 > **本章状态声明**：事件载荷核对自上游 `docs/subsystems/llm-streaming.md`、
-> `docs/subsystems/core.md` 与 `docs/subsystems/session.md`；代码未经本工作区实测。
+> `docs/subsystems/core.md` 与 `docs/subsystems/session.md`；代码已按工作区实测实现
+> 核对（2026-09-15）。
 
 ## 1. 三个观测位，三种时间性
 

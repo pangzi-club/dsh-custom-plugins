@@ -8,7 +8,7 @@
     "noEmitOnError": true,
     "rootDir": "src",
     "outDir": ".build",
-    "types": ["Node"]
+    "types": ["node"]
   },
   "include": ["src/index.ts", "src/host"]
 }

@@ -9,7 +9,7 @@ v5 的胶囊「能看」，v6 让它「好用」：点开是**菜单**（类型�
 （定位钩子 + 外点关闭 + Esc），本章起能不写就不写。
 
 > **本章状态声明**：组件 props 与座位契约核对自上游 `packages/client/ui-primitives`
-> 源码与 `slot-catalog.ts` 生成目录；代码未经本工作区实测。
+> 源码与 `slot-catalog.ts` 生成目录；代码已按工作区实测实现核对（2026-09-15）。
 
 ## 1. 座位系统：四种 cardinality
 
@@ -151,6 +151,14 @@ CSS 追加（记录列表与会话内卡片；依旧只用语义层 token）：
 ```
 
 ### 3.3 新组件：菜单、详情、Toast、会话内卡片
+
+先把 import 补上——primitives 是模块表里的**裸包名**，不是全局标识符；不写这行，
+编译产物里的 `Menu` 就是未定义名字，首次渲染直接 ReferenceError（§3.1 垫片声明覆盖
+的正是这条 import；初稿漏了它，已回修）：
+
+```ts
+import { Menu, Modal, Toast, StateDot } from '@deepseek-ai/dsh-client-ui-primitives'
+```
 
 **过滤菜单**——`Menu` 的 anchor 是渲染在原位的触发元素（不是 ref），所以胶囊按钮直接
 作为 `anchor` 传入；`side: 'top'` 让菜单向上开（dock 在页面底部），`portal` 逃出
@@ -489,6 +497,9 @@ chrome，我们只需要遵守自己的列表样式用 hairline `border-l2`。
 - **钩子顺序高于提前返回**：座位组件也是 React 组件——`useResource`/`useState`/
   `useEffect` 必须在任何 `return null` 之前调用。v5 的胶囊靠 props 稳定侥幸合规，v6
   的写法才是对的；新座位组件照 v6 抄；
+- **primitives 是裸包名，不是全局标识符**：`Menu`/`Modal`/`Toast`/`StateDot` 必须从
+  `@deepseek-ai/dsh-client-ui-primitives` import 进来——初稿漏了这行，照抄会在首次
+  渲染时 ReferenceError（已在 §3.3 回修）；
 - **key 拼错 = 永远不渲染**：keyed 座位的 key 域开放、无编译期检查，上游原话「a typo
   simply never renders」——卡片没出现时第一件事是逐字符对 key（工具名是注册名不是
   显示名）。活体排查用 `cordis_inspect` 的 client 视图看座位与住户；

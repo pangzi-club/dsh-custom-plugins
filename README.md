@@ -14,6 +14,7 @@ DeepSeek Harness（DSH）的**出仓插件工作区**：这里以独立目录开
 | [`dsh-favicon-triangle/`](dsh-favicon-triangle/README.md) | `favicon-triangle` | 把 Web GUI 的浏览器标签页图标（以及「安装为应用」后的图标）换成三角形，随浅色/深色配色自动反色 | Host 单半边（`webServer` exact 路由） |
 | [`dsh-cost/`](dsh-cost/README.md) | `dsh-cost` | 在 Web GUI 输入框统计行下方加一个「对话费用」胶囊：点击展开面板，显示本次会话费用（按模型、按 token 桶、按高峰/空闲分档）与 DeepSeek 账户余额 | Host 半边（两条 `connection.fetch` 路由）+ Web Client 半边（`conversation.composer.dock` 插槽） |
 | [`dsh-stats/`](dsh-stats/README.md) | `dsh-session-stats` | 在 Web GUI 输入框统计行下方加一个「会话用量」胶囊：点击展开面板，显示本次会话按模型分组的 token 用量与估算费用；另注册 `session_stats` 工具 | Host 半边（`connection.fetch` 路由 + 工具，TypeScript 源码在 `src/`，构建产物统一在 `lib/`、不入库）+ Web Client 半边（`conversation.composer.dock` 插槽） |
+| [`dsh-tool-watchtower/`](dsh-tool-watchtower/README.md) | `dsh-tool-watchtower` | 工具与模型活动的「瞭望塔」：工具调用门禁（allow/deny/ask）、结果变换（脱敏/标注/阻断）与计时，模型调用只读观测（路由、实时 token、提示词入口）；GUI 里有 live 胶囊、活动面板、Toast 与自定义工具卡片 | Host 半边（事件管线 + `connection.fetch` 路由 + 两个工具，`src/` → `lib/` 不入库）+ Web Client 半边（`resources` provider + 两个 list 座位 + 一个 keyed 座位） |
 
 各插件的实现原理、全部配置项、构建方式与已知限制，见各自目录下的 README。
 
@@ -42,6 +43,13 @@ dsh-custom/
     ├── lib/                     # 构建产物（.gitignore 忽略，node build.mjs 本地生成）
     ├── build.mjs                # 用插件自带的 tsc（devDependency）重建两个半边到 lib/
     └── test/*.test.mjs
+└── dsh-tool-watchtower/         # 插件：工具与模型活动瞭望塔（进阶教程贯穿示例）
+    ├── src/index.ts             # Host 入口：事件管线接线 + ping/activity 路由 + 两个工具
+    ├── src/host/                # 纯函数模块（activity 折叠 / rules 门禁 / transform 变换）与 ctx 类型
+    ├── src/client/index.tsx     # Web Client：provider + 胶囊/头部入口/keyed 卡片（单文件）
+    ├── lib/                     # 构建产物（.gitignore 忽略，node build.mjs 本地生成）
+    ├── build.mjs                # 双半边构建：tsc 编译 + ModuleLoader 信封
+    └── test/*.test.mjs          # 含瀑布 harness（composeWaterfall）与 bundle 测试
 ```
 
 ## 环境前提
@@ -126,6 +134,7 @@ pnpm dsh --profile web --dump-config     # 可见 "# == dsh-favicon-triangle" �
 cd dsh-favicon-triangle && npm test    # node --test，6 项
 cd dsh-cost && npm test                # node --test，40 项
 cd dsh-stats && npm test               # node --test，24 项
+cd dsh-tool-watchtower && npm test     # node --test，42 项
 ```
 
 修改 `dsh-cost/src/client/index.tsx` 后需要重建客户端 bundle（`lib/client.js` 已提交，

@@ -10,7 +10,7 @@ v3 把哨塔从「拦在前面」推进到「跟在后面」：`tools/post-execu
 
 > **本章状态声明**：决策类型、包裹约束与呈现词汇核对自上游 `docs/subsystems/tools.md`、
 > `docs/cookbook/adding-a-tool.md` 与仓内 `repeat-tool-reminder`/`spill-policy` 监听者；
-> 代码未经本工作区实测。
+> 代码已按工作区实测实现核对（2026-09-15）。
 
 ## 1. `tools/post-execute`：结果的三种命运
 

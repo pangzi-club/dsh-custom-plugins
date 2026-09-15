@@ -9,8 +9,8 @@
 收进 provider 一处，组件只管读。
 
 > **本章状态声明**：资源模型契约核对自上游 `packages/client/resources`（`Resources`
-> 接口与 `ResourceRegistry` 实现）与 `docs/subsystems/client-resources.md`；代码未经
-> 本工作区实测。
+> 接口与 `ResourceRegistry` 实现）与 `docs/subsystems/client-resources.md`；代码已按
+> 工作区实测实现核对（2026-09-15）。
 
 ## 1. 资源模型：地址、提供者、四态
 
@@ -48,7 +48,7 @@ follow 同款思路）：宿主每次落账就 `revision + 1`，provider 每秒�
 
 ### 2.1 `activity.ts`：修订号
 
-环形缓冲已经有「每次变更」的语义，缺的只是一个可比较的数。两处增量：
+环形缓冲已经有「每次变更」的语义，缺的只是一个可比较的数。三处增量：
 
 ```ts
 export class ActivityLog {
@@ -57,7 +57,14 @@ export class ActivityLog {
   private revision = 0
   private route: RouteSnapshot | undefined
 
-  // …既有方法不变…
+  // …其余既有方法不变，唯 setRoute 要补上 revision 递增——路由也是 snapshot 的一
+  // 部分，不递增的话「纯路由变化」永远不产新帧，面板上的模型会停在旧值：
+
+  /** The durable route snapshot replaces — never appends — on each header. */
+  setRoute(time: number, provider: string, model: string): void {
+    this.revision += 1
+    this.route = { time, provider, model }
+  }
 
   snapshot(): {
     revision: number
@@ -433,6 +440,8 @@ node build.mjs
   上游原文「a throw inside the stream is a programming error and is not caught」；
 - **修订号比较要防首帧陷阱**：`lastRevision` 初始化为 -1 而不是 0——否则「空会话的
   revision 0」与「还没取过」分不清，首帧逻辑会写出一堆特判；
+- **路由变化也要递增 revision**：`route` 在 snapshot 里，`setRoute` 不递增 revision 的
+  话「纯路由变化」永远不产新帧——面板上的「当前模型」会停在旧值（初稿漏了，已回修）；
 - **未知会话给空快照，不给 404**：面板的生命周期先于会话的第一条记录（刚打开页面就
   挂载），404 会让它永远停在 failed；
 - **轮询间隔与宿主负载**：每个开着面板的会话每秒一个请求；引用计数保证没订阅就没请求，

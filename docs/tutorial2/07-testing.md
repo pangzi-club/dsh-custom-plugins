@@ -7,8 +7,9 @@
 变换型监听者尊不尊重下游的 block？本章把第一辑第 7 章的三层金字塔搬进瀑布世界：纯函数
 照旧单测，**fakeCtx 升级成能组合瀑布的 harness**，vm 信封测试扩到三个座位。
 
-> **本章状态声明**：测试代码依据前六章的教程代码撰写，与全部代码一样未经本工作区
-> 实测；断言的语义以 `node:test` 与前文的代码为准。
+> **本章状态声明**：测试代码依据前六章的教程代码撰写；2026-09-15 按实测回修了 §2
+> harness 的组合契约，断言语义以 `node:test` 与
+> [`dsh-tool-watchtower/test/`](../../dsh-tool-watchtower/test/) 为准。
 
 ## 1. 三层各测什么
 
@@ -28,13 +29,15 @@ fakeCtx 要如实模拟这一点，测试才有意义。
 ## 2. 瀑布 harness：把链组合出来
 
 第一辑 index.test 的 fakeCtx 只**收集**监听者；这里再加一个组合器，按 cordis 的顺序
-把监听者串成链，末端接一个可断言的 terminal：
+把监听者串成链，末端接一个可断言的 terminal——**terminal 扮演框架默认行为**，它同时
+就是「下游被到达了几次」的断言点：
 
 ```js
 /**
  * Compose registered listeners into one waterfall chain, cordis-style: the
  * first-registered listener runs first, its next() reaches the second, …, and
- * the terminal runs when the chain runs out.
+ * `terminal` runs when the chain runs out — it plays the framework's default
+ * behaviour, so it is also the assertion point for "downstream was reached".
  */
 function composeWaterfall(listeners, terminal) {
   return async (...payload) => {
@@ -47,11 +50,13 @@ function composeWaterfall(listeners, terminal) {
 }
 ```
 
-两个惯用断言道具：
+两条纪律（初稿在这里翻过车，实测揪出来的）：
 
-- **`released` 计数器**：terminal 里自增——「下游被到达了几次」的直接证据；
+- **别给 `chain(...)` 额外传一个 `next`**：组合器按位置传参，多出来的实参会把监听者的
+  `next` 形参顶掉——三形参的 `tools/post-execute` 监听者尤其容易中招，链就悄悄断了。
+  委托用「返回默认决策」的 terminal 断言，短路用「抛错」的 terminal 断言；
 - **监听者数组过滤**：`state.events.filter(e => e.eventName === 'tools/pre-execute')`
-  拿到同一事件的所有监听者，交给组合器。
+  拿到同一事件的所有监听者，交给组合器（注册顺序即链序）。
 
 ## 3. 编排层：门禁与变换的行为契约
 
@@ -77,27 +82,27 @@ test('the gate delegates when no rule matches and vetoes when one does', async (
   const state = harness({
     rules: [{ tool: 'write', decision: 'deny', reason: 'read-only session' }],
   })
-  const chain = composeWaterfall(gateListeners(state), () => {
-    throw new Error('downstream must not be reached on a veto')
-  })
 
-  // No match → next() runs, the default decision comes back.
-  const allowed = await chain({ ...EXEC, name: 'read' }, () => ({ kind: 'allow' }))
+  // No match → next() runs; with the chain exhausted the framework default
+  // (the terminal) decides.
+  const delegating = composeWaterfall(gateListeners(state), () => ({ kind: 'allow' }))
+  const allowed = await delegating({ ...EXEC, name: 'read' })
   assert.deepEqual(allowed, { kind: 'allow' })
 
-  // Match → the veto wins, and the thrown terminal above proves the chain stopped.
-  const veto = await chain({ ...EXEC, name: 'write' }, () => {
-    throw new Error('unreachable')
+  // Match → the veto wins, and the throwing terminal proves the chain stopped.
+  const guarded = composeWaterfall(gateListeners(state), () => {
+    throw new Error('downstream must not be reached on a veto')
   })
+  const veto = await guarded({ ...EXEC, name: 'write' })
   assert.deepEqual(veto, { kind: 'deny', reason: 'read-only session' })
 })
 
 test('an allow is a delegation, not an assertion: a downstream veto still wins', async () => {
-  // '*' says allow; a listener registered AFTER the gate (the terminal here)
-  // denies. The gate must not have short-circuited it.
+  // '*' says allow; the chain end (a downstream vetoer here) denies. The gate
+  // must not have short-circuited it.
   const state = harness({ rules: [{ tool: '*', decision: 'allow' }] })
   const chain = composeWaterfall(gateListeners(state), () => ({ kind: 'deny', reason: 'guard says no' }))
-  const verdict = await chain(EXEC, () => { throw new Error('unreachable') })
+  const verdict = await chain(EXEC)
   assert.deepEqual(verdict, { kind: 'deny', reason: 'guard says no' })
 })
 
@@ -109,7 +114,7 @@ test('first match wins: order beats specificity', async () => {
     ],
   })
   const chain = composeWaterfall(gateListeners(state), () => ({ kind: 'allow' }))
-  const verdict = await chain({ ...EXEC, name: 'write' }, () => ({ kind: 'allow' }))
+  const verdict = await chain({ ...EXEC, name: 'write' })
   assert.deepEqual(verdict, { kind: 'allow' })
 })
 
@@ -123,7 +128,7 @@ test('redact replaces the projection and consults downstream first', async () =>
     return { kind: 'accept' }
   })
   const secret = { ...RESULT, content: [{ type: 'text', text: `pw=${SECRET_MARK}123` }] }
-  const decision = await chain(EXEC, secret, () => { throw new Error('unreachable') })
+  const decision = await chain(EXEC, secret)
   assert.equal(downstreamReached, true, 'the transform delegates before overlaying')
   assert.equal(decision.kind, 'accept')
   assert.equal(decision.content[0].text, 'pw=[redacted]123')
@@ -137,7 +142,7 @@ test('block ends the chain on purpose', async () => {
     throw new Error('unreachable')
   })
   const secret = { ...RESULT, content: [{ type: 'text', text: SECRET_MARK }] }
-  const decision = await chain(EXEC, secret, () => ({ kind: 'accept' }))
+  const decision = await chain(EXEC, secret)
   assert.equal(decision.kind, 'block')
   assert.match(decision.feedback[0].text, /Re-run without embedding secrets/)
 })
@@ -149,14 +154,14 @@ test('annotate folds onto the downstream decision and respects a block', async (
 
   // Downstream accepts → the notice rides on top.
   const chainAccept = composeWaterfall(transformListeners(state), () => ({ kind: 'accept' }))
-  const folded = await chainAccept(EXEC, RESULT, () => { throw new Error('unreachable') })
+  const folded = await chainAccept(EXEC, RESULT)
   assert.equal(folded.kind, 'accept')
   assert.equal(folded.additionalContexts.length, 1)
   assert.equal(folded.additionalContexts[0].source.plugin, 'dsh-tool-watchtower')
 
   // Downstream blocks → the transform must NOT un-block it.
   const chainBlock = composeWaterfall(transformListeners(state), () => ({ kind: 'block', feedback: [{ type: 'text', text: 'no' }] }))
-  const respected = await chainBlock(EXEC, RESULT, () => { throw new Error('unreachable') })
+  const respected = await chainBlock(EXEC, RESULT)
   assert.equal(respected.kind, 'block')
 })
 
@@ -166,12 +171,19 @@ test('the wrapper times the dispatch and the result observer banks it', async ()
     state.events.filter(e => e.eventName === 'tools/execute').map(e => e.listener),
     () => ({ isError: false, value: {} }),
   )
-  await execute(EXEC, () => { throw new Error('unreachable') })
+  await execute(EXEC)
 
+  // 读会话日志走已注册的 activity API——测行为，不摸 apply 闭包的内幕
+  const activityOf = sessionId => ({
+    snapshot: async () => {
+      const route = state.fetchRoutes.find(candidate => candidate.path === '/api/dsh-tool-watchtower/activity')
+      const response = await route.fetch(new Request(`http://watchtower.test/api/dsh-tool-watchtower/activity?session=${encodeURIComponent(sessionId)}`))
+      return response.json()
+    },
+  })
   const resultListener = state.events.find(e => e.eventName === 'tools/result').listener
-  const log = state.activityOf('s1')   // harness 里暴露 sessions Map 的读取口
   resultListener(EXEC, { isError: false, value: {} })
-  const { records } = log.snapshot()
+  const { records } = await activityOf('s1').snapshot()
   const tool = records.find(record => record.kind === 'tool')
   assert.equal(tool.name, 'watchtower_echo')
   assert.equal(typeof tool.durationMs, 'number')
